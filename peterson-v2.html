@@ -1,0 +1,5769 @@
+<!doctype html><html lang="en"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Peterson v2: Python → composed RM → Lean</title>
+<style>
+body{font:16px/1.5 system-ui,sans-serif;margin:2rem;color:#17212b}
+table{border-collapse:collapse;width:100%;table-layout:fixed;min-width:1000px}
+th,td{border:1px solid #bac3cc;padding:.7rem;vertical-align:top;text-align:left}
+th{background:#edf2f6}.columns{overflow-x:auto}
+pre{font:13px/1.45 monospace;white-space:pre-wrap;overflow-wrap:anywhere}
+details{margin:1rem 0}summary{cursor:pointer;font-weight:bold}
+details pre{max-height:40rem;overflow:auto}p{max-width:95ch}
+</style><body><h1>Peterson v2: Python → composed RM → Lean</h1>
+<p>Read <a href="peterson-v2.md">the comparison and trust boundaries</a>.
+These columns contain the actual Python classes, native atom printer output, and accepted Lean definitions.
+Internal AnyBool wires select alternatives; there are no external run flags.
+Source: <a href="https://www.cis.upenn.edu/~alur/FMSD99.pdf">Alur and Henzinger, Figure 2</a>.</p>
+<p>The proof covers all four initial flag valuations and unbounded executions of the composed relation.
+Lean also checks source/native correspondence, ownership and await order, initial nonemptiness,
+nonblocking updates, and equality with the separately specified initial and round relations.
+Native AnyBool is exported by enumerating its complete Boolean domain. The extractor/exporter and
+the operational model of the supported Python subset remain trusted; this is not a CPython proof.</p>
+<p>Regenerate with <code>formal/.venv/bin/python formal/composition_report.py</code>.</p>
+<h2>P1</h2><div class='columns'><table><thead><tr><th>Python process</th><th>Native RM atom after composition</th><th>Generated Lean</th></tr></thead><tbody><tr><td><pre><code>class P1:
+    pc: int
+    x: bool
+
+    def __init__(self, x: bool) -&gt; None:
+        self.pc = 0
+        self.x = x
+
+    def advance(self, pc2: int, x2: bool) -&gt; None:
+        if self.pc == 0:
+            self.pc = 1
+            self.x = x2
+        elif self.pc == 1:
+            if pc2 == 0 or self.x != x2:
+                self.pc = 2
+        elif self.pc == 2:
+            self.pc = 0
+</code></pre></td><td><pre><code>atom controls pc1 : Int([1,1]), x1 : Bool([1,1]) reads pc1 : Int([1,1]), pc2 : Int([1,1]), x1 : Bool([1,1]), x2 : Bool([1,1])
+init
+  #310 := AnyBool 
+  #311 := [[0]] 
+  #312 := Ite (#310, #311, #311)
+  #313 := [[false]] 
+  #314 := [[true]] 
+  #315 := Ite (#310, #313, #314)
+  X(pc1) := Id #312
+  X(x1) := Id #315
+delay
+  d(pc1) := ZERO 
+  d(x1) := ZERO 
+update
+  #316 := AnyBool 
+  #317 := [[0]] 
+  #318 := Eq (pc1, #317)
+  #319 := [[1]] 
+  #320 := Eq (pc1, #319)
+  #321 := Eq (pc2, #317)
+  #322 := Not x2
+  #323 := Ite (x1, #322, x2)
+  #324 := Or (#321, #323)
+  #325 := [[2]] 
+  #326 := Ite (#324, #325, pc1)
+  #327 := Eq (pc1, #325)
+  #328 := Ite (#327, #317, pc1)
+  #329 := Ite (#320, #326, #328)
+  #330 := Ite (#318, #319, #329)
+  #331 := Ite (#316, pc1, #330)
+  #332 := Ite (#318, x2, x1)
+  #333 := Ite (#316, x1, #332)
+  X(pc1) := Id #331
+  X(x1) := Id #333
+</code></pre></td><td><pre><code>def graphn0 : Graph := ⟨0, [(.lit (0)), (.lit (0)), (.ite (.var 0) (.var 1) (.var 1)), (.lit (0)), (.lit (1)), (.ite (.var 0) (.var 3) (.var 4)), (.var 2), (.var 5)], [6, 7]⟩
+theorem graph_evaln0 (env : Env) : graphn0.run env = [((.ite (.lit (0)) (.lit (0)) (.lit (0))) : Expr).eval env, ((.ite (.lit (0)) (.lit (0)) (.lit (1))) : Expr).eval env] := by rfl
+
+def graphn1 : Graph := ⟨0, [(.lit (1)), (.lit (0)), (.ite (.var 0) (.var 1) (.var 1)), (.lit (0)), (.lit (1)), (.ite (.var 0) (.var 3) (.var 4)), (.var 2), (.var 5)], [6, 7]⟩
+theorem graph_evaln1 (env : Env) : graphn1.run env = [((.ite (.lit (1)) (.lit (0)) (.lit (0))) : Expr).eval env, ((.ite (.lit (1)) (.lit (0)) (.lit (1))) : Expr).eval env] := by rfl
+
+def graphn2 : Graph := ⟨4, [(.lit (0)), (.lit (0)), (.bin .eq (.var 0) (.var 5)), (.lit (1)), (.bin .eq (.var 0) (.var 7)), (.bin .eq (.var 1) (.var 5)), (.ite (.var 3) (.lit (0)) (.lit (1))), (.ite (.var 2) (.var 10) (.var 3)), (.bin .or (.var 9) (.var 11)), (.lit (2)), (.ite (.var 12) (.var 13) (.var 0)), (.bin .eq (.var 0) (.var 13)), (.ite (.var 15) (.var 5) (.var 0)), (.ite (.var 8) (.var 14) (.var 16)), (.ite (.var 6) (.var 7) (.var 17)), (.ite (.var 4) (.var 0) (.var 18)), (.ite (.var 6) (.var 3) (.var 2)), (.ite (.var 4) (.var 2) (.var 20)), (.var 19), (.var 21)], [22, 23]⟩
+theorem graph_evaln2 (env : Env) : graphn2.run env = [((.ite (.lit (0)) (.var 0) (.ite (.bin .eq (.var 0) (.lit (0))) (.lit (1)) (.ite (.bin .eq (.var 0) (.lit (1))) (.ite (.bin .or (.bin .eq (.var 1) (.lit (0))) (.ite (.var 2) (.ite (.var 3) (.lit (0)) (.lit (1))) (.var 3))) (.lit (2)) (.var 0)) (.ite (.bin .eq (.var 0) (.lit (2))) (.lit (0)) (.var 0))))) : Expr).eval env, ((.ite (.lit (0)) (.var 2) (.ite (.bin .eq (.var 0) (.lit (0))) (.var 3) (.var 2))) : Expr).eval env] := by rfl
+
+def graphn3 : Graph := ⟨4, [(.lit (1)), (.lit (0)), (.bin .eq (.var 0) (.var 5)), (.lit (1)), (.bin .eq (.var 0) (.var 7)), (.bin .eq (.var 1) (.var 5)), (.ite (.var 3) (.lit (0)) (.lit (1))), (.ite (.var 2) (.var 10) (.var 3)), (.bin .or (.var 9) (.var 11)), (.lit (2)), (.ite (.var 12) (.var 13) (.var 0)), (.bin .eq (.var 0) (.var 13)), (.ite (.var 15) (.var 5) (.var 0)), (.ite (.var 8) (.var 14) (.var 16)), (.ite (.var 6) (.var 7) (.var 17)), (.ite (.var 4) (.var 0) (.var 18)), (.ite (.var 6) (.var 3) (.var 2)), (.ite (.var 4) (.var 2) (.var 20)), (.var 19), (.var 21)], [22, 23]⟩
+theorem graph_evaln3 (env : Env) : graphn3.run env = [((.ite (.lit (1)) (.var 0) (.ite (.bin .eq (.var 0) (.lit (0))) (.lit (1)) (.ite (.bin .eq (.var 0) (.lit (1))) (.ite (.bin .or (.bin .eq (.var 1) (.lit (0))) (.ite (.var 2) (.ite (.var 3) (.lit (0)) (.lit (1))) (.var 3))) (.lit (2)) (.var 0)) (.ite (.bin .eq (.var 0) (.lit (2))) (.lit (0)) (.var 0))))) : Expr).eval env, ((.ite (.lit (1)) (.var 2) (.ite (.bin .eq (.var 0) (.lit (0))) (.var 3) (.var 2))) : Expr).eval env] := by rfl
+
+def atom0 : Atom State where
+  controls := [0, 2]
+  reads := [0, 1, 2, 3]
+  awaits := []
+  initial s := ([s.f0, flag s.f2] = graphn0.run (environment [])) ∨ ([s.f0, flag s.f2] = graphn1.run (environment []))
+  step s t := ([t.f0, flag t.f2] = graphn2.run (environment [s.f0, s.f1, flag s.f2, flag s.f3])) ∨ ([t.f0, flag t.f2] = graphn3.run (environment [s.f0, s.f1, flag s.f2, flag s.f3]))
+def sourceAtom0 : Atom State where
+  controls := [0, 2]
+  reads := [0, 1, 2, 3]
+  awaits := []
+  initial s := ([s.f0, flag s.f2] = ((source0.exec (environment [])).outputs 2).take 2) ∨ ([s.f0, flag s.f2] = ((source1.exec (environment [])).outputs 2).take 2)
+  step s t := ([t.f0, flag t.f2] = [s.f0, flag s.f2]) ∨ ([t.f0, flag t.f2] = ((source2.exec (environment [s.f0, flag s.f2, s.f1, flag s.f3])).outputs 2).take 2)
+theorem atom_agreement0 : sourceAtom0 = atom0 := by
+  have agree0  : (source0.exec (environment [])).outputs 2 = graph0.run (environment []) := by
+    exact translation0 _ (by simp [environment])
+  have agree1  : (source1.exec (environment [])).outputs 2 = graph1.run (environment []) := by
+    exact translation1 _ (by simp [environment])
+  have agree2 (s : State) : (source2.exec (environment [s.f0, flag s.f2, s.f1, flag s.f3])).outputs 2 = graph2.run (environment [s.f0, flag s.f2, s.f1, flag s.f3]) := by
+    exact translation2 _ (by simp [environment])
+  unfold sourceAtom0 atom0
+  rw [Atom.mk.injEq]
+  refine ⟨rfl, rfl, rfl, ?_, ?_⟩
+  · funext s; apply propext
+    simp only [agree0, agree1, agree2]
+    all_goals
+      simp_all (config := {failIfUnchanged := false}) [source0, graph_eval0, source1, graph_eval1, source2, graph_eval2, source3, graph_eval3, source4, graph_eval4, source5, graph_eval5, source6, graph_eval6, source7, graph_eval7, source8, graph_eval8, source9, graph_eval9, source10, graph_eval10, graph_evaln0, graph_evaln1, graph_evaln2, graph_evaln3, graph_evaln4, graph_evaln5, graph_evaln6, graph_evaln7, encodeState, RMVerify.environment, RMVerify.update, RMVerify.Expr.eval, RMVerify.Op.eval, RMVerify.Stmt.exec, List.range_succ]
+      all_goals (repeat&#x27; (first | omega | split &lt;;&gt; simp_all (config := {failIfUnchanged := false}) [RMVerify.environment, RMVerify.update, RMVerify.Expr.eval, RMVerify.Op.eval, RMVerify.Stmt.exec, List.range_succ]))
+      all_goals first | omega | grind [RMVerify.flag]
+  · funext s t; apply propext
+    simp only [agree0, agree1, agree2]
+    all_goals
+      simp_all (config := {failIfUnchanged := false}) [source0, graph_eval0, source1, graph_eval1, source2, graph_eval2, source3, graph_eval3, source4, graph_eval4, source5, graph_eval5, source6, graph_eval6, source7, graph_eval7, source8, graph_eval8, source9, graph_eval9, source10, graph_eval10, graph_evaln0, graph_evaln1, graph_evaln2, graph_evaln3, graph_evaln4, graph_evaln5, graph_evaln6, graph_evaln7, encodeState, RMVerify.environment, RMVerify.update, RMVerify.Expr.eval, RMVerify.Op.eval, RMVerify.Stmt.exec, List.range_succ]
+      all_goals (repeat&#x27; (first | omega | split &lt;;&gt; simp_all (config := {failIfUnchanged := false}) [RMVerify.environment, RMVerify.update, RMVerify.Expr.eval, RMVerify.Op.eval, RMVerify.Stmt.exec, List.range_succ]))
+      all_goals first | omega | grind [RMVerify.flag]
+#print axioms atom_agreement0</code></pre></td></tr></tbody></table></div><h2>P2</h2><div class='columns'><table><thead><tr><th>Python process</th><th>Native RM atom after composition</th><th>Generated Lean</th></tr></thead><tbody><tr><td><pre><code>class P2:
+    pc: int
+    x: bool
+
+    def __init__(self, x: bool) -&gt; None:
+        self.pc = 0
+        self.x = x
+
+    def advance(self, pc1: int, x1: bool) -&gt; None:
+        if self.pc == 0:
+            self.pc = 1
+            self.x = not x1
+        elif self.pc == 1:
+            if pc1 == 0 or self.x == x1:
+                self.pc = 2
+        elif self.pc == 2:
+            self.pc = 0
+</code></pre></td><td><pre><code>atom controls pc2 : Int([1,1]), x2 : Bool([1,1]) reads pc1 : Int([1,1]), pc2 : Int([1,1]), x1 : Bool([1,1]), x2 : Bool([1,1])
+init
+  #334 := AnyBool 
+  #335 := [[0]] 
+  #336 := Ite (#334, #335, #335)
+  #337 := [[false]] 
+  #338 := [[true]] 
+  #339 := Ite (#334, #337, #338)
+  X(pc2) := Id #336
+  X(x2) := Id #339
+delay
+  d(pc2) := ZERO 
+  d(x2) := ZERO 
+update
+  #340 := AnyBool 
+  #341 := [[0]] 
+  #342 := Eq (pc2, #341)
+  #343 := [[1]] 
+  #344 := Eq (pc2, #343)
+  #345 := Eq (pc1, #341)
+  #346 := Not x1
+  #347 := Ite (x2, x1, #346)
+  #348 := Or (#345, #347)
+  #349 := [[2]] 
+  #350 := Ite (#348, #349, pc2)
+  #351 := Eq (pc2, #349)
+  #352 := Ite (#351, #341, pc2)
+  #353 := Ite (#344, #350, #352)
+  #354 := Ite (#342, #343, #353)
+  #355 := Ite (#340, pc2, #354)
+  #356 := [[false]] 
+  #357 := Not #356
+  #358 := Ite (x1, #356, #357)
+  #359 := Ite (#342, #358, x2)
+  #360 := Ite (#340, x2, #359)
+  X(pc2) := Id #355
+  X(x2) := Id #360
+</code></pre></td><td><pre><code>def graphn4 : Graph := ⟨0, [(.lit (0)), (.lit (0)), (.ite (.var 0) (.var 1) (.var 1)), (.lit (0)), (.lit (1)), (.ite (.var 0) (.var 3) (.var 4)), (.var 2), (.var 5)], [6, 7]⟩
+theorem graph_evaln4 (env : Env) : graphn4.run env = [((.ite (.lit (0)) (.lit (0)) (.lit (0))) : Expr).eval env, ((.ite (.lit (0)) (.lit (0)) (.lit (1))) : Expr).eval env] := by rfl
+
+def graphn5 : Graph := ⟨0, [(.lit (1)), (.lit (0)), (.ite (.var 0) (.var 1) (.var 1)), (.lit (0)), (.lit (1)), (.ite (.var 0) (.var 3) (.var 4)), (.var 2), (.var 5)], [6, 7]⟩
+theorem graph_evaln5 (env : Env) : graphn5.run env = [((.ite (.lit (1)) (.lit (0)) (.lit (0))) : Expr).eval env, ((.ite (.lit (1)) (.lit (0)) (.lit (1))) : Expr).eval env] := by rfl
+
+def graphn6 : Graph := ⟨4, [(.lit (0)), (.lit (0)), (.bin .eq (.var 1) (.var 5)), (.lit (1)), (.bin .eq (.var 1) (.var 7)), (.bin .eq (.var 0) (.var 5)), (.ite (.var 2) (.lit (0)) (.lit (1))), (.ite (.var 3) (.var 2) (.var 10)), (.bin .or (.var 9) (.var 11)), (.lit (2)), (.ite (.var 12) (.var 13) (.var 1)), (.bin .eq (.var 1) (.var 13)), (.ite (.var 15) (.var 5) (.var 1)), (.ite (.var 8) (.var 14) (.var 16)), (.ite (.var 6) (.var 7) (.var 17)), (.ite (.var 4) (.var 1) (.var 18)), (.lit (0)), (.ite (.var 20) (.lit (0)) (.lit (1))), (.ite (.var 2) (.var 20) (.var 21)), (.ite (.var 6) (.var 22) (.var 3)), (.ite (.var 4) (.var 3) (.var 23)), (.var 19), (.var 24)], [25, 26]⟩
+theorem graph_evaln6 (env : Env) : graphn6.run env = [((.ite (.lit (0)) (.var 1) (.ite (.bin .eq (.var 1) (.lit (0))) (.lit (1)) (.ite (.bin .eq (.var 1) (.lit (1))) (.ite (.bin .or (.bin .eq (.var 0) (.lit (0))) (.ite (.var 3) (.var 2) (.ite (.var 2) (.lit (0)) (.lit (1))))) (.lit (2)) (.var 1)) (.ite (.bin .eq (.var 1) (.lit (2))) (.lit (0)) (.var 1))))) : Expr).eval env, ((.ite (.lit (0)) (.var 3) (.ite (.bin .eq (.var 1) (.lit (0))) (.ite (.var 2) (.lit (0)) (.ite (.lit (0)) (.lit (0)) (.lit (1)))) (.var 3))) : Expr).eval env] := by rfl
+
+def graphn7 : Graph := ⟨4, [(.lit (1)), (.lit (0)), (.bin .eq (.var 1) (.var 5)), (.lit (1)), (.bin .eq (.var 1) (.var 7)), (.bin .eq (.var 0) (.var 5)), (.ite (.var 2) (.lit (0)) (.lit (1))), (.ite (.var 3) (.var 2) (.var 10)), (.bin .or (.var 9) (.var 11)), (.lit (2)), (.ite (.var 12) (.var 13) (.var 1)), (.bin .eq (.var 1) (.var 13)), (.ite (.var 15) (.var 5) (.var 1)), (.ite (.var 8) (.var 14) (.var 16)), (.ite (.var 6) (.var 7) (.var 17)), (.ite (.var 4) (.var 1) (.var 18)), (.lit (0)), (.ite (.var 20) (.lit (0)) (.lit (1))), (.ite (.var 2) (.var 20) (.var 21)), (.ite (.var 6) (.var 22) (.var 3)), (.ite (.var 4) (.var 3) (.var 23)), (.var 19), (.var 24)], [25, 26]⟩
+theorem graph_evaln7 (env : Env) : graphn7.run env = [((.ite (.lit (1)) (.var 1) (.ite (.bin .eq (.var 1) (.lit (0))) (.lit (1)) (.ite (.bin .eq (.var 1) (.lit (1))) (.ite (.bin .or (.bin .eq (.var 0) (.lit (0))) (.ite (.var 3) (.var 2) (.ite (.var 2) (.lit (0)) (.lit (1))))) (.lit (2)) (.var 1)) (.ite (.bin .eq (.var 1) (.lit (2))) (.lit (0)) (.var 1))))) : Expr).eval env, ((.ite (.lit (1)) (.var 3) (.ite (.bin .eq (.var 1) (.lit (0))) (.ite (.var 2) (.lit (0)) (.ite (.lit (0)) (.lit (0)) (.lit (1)))) (.var 3))) : Expr).eval env] := by rfl
+
+def atom1 : Atom State where
+  controls := [1, 3]
+  reads := [0, 1, 2, 3]
+  awaits := []
+  initial s := ([s.f1, flag s.f3] = graphn4.run (environment [])) ∨ ([s.f1, flag s.f3] = graphn5.run (environment []))
+  step s t := ([t.f1, flag t.f3] = graphn6.run (environment [s.f0, s.f1, flag s.f2, flag s.f3])) ∨ ([t.f1, flag t.f3] = graphn7.run (environment [s.f0, s.f1, flag s.f2, flag s.f3]))
+def sourceAtom1 : Atom State where
+  controls := [1, 3]
+  reads := [0, 1, 2, 3]
+  awaits := []
+  initial s := ([s.f1, flag s.f3] = ((source3.exec (environment [])).outputs 2).take 2) ∨ ([s.f1, flag s.f3] = ((source4.exec (environment [])).outputs 2).take 2)
+  step s t := ([t.f1, flag t.f3] = [s.f1, flag s.f3]) ∨ ([t.f1, flag t.f3] = ((source5.exec (environment [s.f1, flag s.f3, s.f0, flag s.f2])).outputs 2).take 2)
+theorem atom_agreement1 : sourceAtom1 = atom1 := by
+  have agree3  : (source3.exec (environment [])).outputs 2 = graph3.run (environment []) := by
+    exact translation3 _ (by simp [environment])
+  have agree4  : (source4.exec (environment [])).outputs 2 = graph4.run (environment []) := by
+    exact translation4 _ (by simp [environment])
+  have agree5 (s : State) : (source5.exec (environment [s.f1, flag s.f3, s.f0, flag s.f2])).outputs 2 = graph5.run (environment [s.f1, flag s.f3, s.f0, flag s.f2]) := by
+    exact translation5 _ (by simp [environment])
+  unfold sourceAtom1 atom1
+  rw [Atom.mk.injEq]
+  refine ⟨rfl, rfl, rfl, ?_, ?_⟩
+  · funext s; apply propext
+    simp only [agree3, agree4, agree5]
+    all_goals
+      simp_all (config := {failIfUnchanged := false}) [source0, graph_eval0, source1, graph_eval1, source2, graph_eval2, source3, graph_eval3, source4, graph_eval4, source5, graph_eval5, source6, graph_eval6, source7, graph_eval7, source8, graph_eval8, source9, graph_eval9, source10, graph_eval10, graph_evaln0, graph_evaln1, graph_evaln2, graph_evaln3, graph_evaln4, graph_evaln5, graph_evaln6, graph_evaln7, encodeState, atom0, RMVerify.environment, RMVerify.update, RMVerify.Expr.eval, RMVerify.Op.eval, RMVerify.Stmt.exec, List.range_succ]
+      all_goals (repeat&#x27; (first | omega | split &lt;;&gt; simp_all (config := {failIfUnchanged := false}) [RMVerify.environment, RMVerify.update, RMVerify.Expr.eval, RMVerify.Op.eval, RMVerify.Stmt.exec, List.range_succ]))
+      all_goals first | omega | grind [RMVerify.flag]
+  · funext s t; apply propext
+    simp only [agree3, agree4, agree5]
+    all_goals
+      simp_all (config := {failIfUnchanged := false}) [source0, graph_eval0, source1, graph_eval1, source2, graph_eval2, source3, graph_eval3, source4, graph_eval4, source5, graph_eval5, source6, graph_eval6, source7, graph_eval7, source8, graph_eval8, source9, graph_eval9, source10, graph_eval10, graph_evaln0, graph_evaln1, graph_evaln2, graph_evaln3, graph_evaln4, graph_evaln5, graph_evaln6, graph_evaln7, encodeState, atom0, RMVerify.environment, RMVerify.update, RMVerify.Expr.eval, RMVerify.Op.eval, RMVerify.Stmt.exec, List.range_succ]
+      all_goals (repeat&#x27; (first | omega | split &lt;;&gt; simp_all (config := {failIfUnchanged := false}) [RMVerify.environment, RMVerify.update, RMVerify.Expr.eval, RMVerify.Op.eval, RMVerify.Stmt.exec, List.range_succ]))
+      all_goals first | omega | grind [RMVerify.flag]
+#print axioms atom_agreement1</code></pre></td></tr></tbody></table></div><h2>Complete Python specification</h2><pre><code>&quot;&quot;&quot;FMSD99 Figure 2 as separate Python processes and a closed RM composition.
+
+Each advance call is an atomic local operation. The RM composition chooses
+independently whether each process advances or sleeps in a round.
+&quot;&quot;&quot;
+from rmverify import Component, Composition
+
+
+class P1:
+    pc: int
+    x: bool
+
+    def __init__(self, x: bool) -&gt; None:
+        self.pc = 0
+        self.x = x
+
+    def advance(self, pc2: int, x2: bool) -&gt; None:
+        if self.pc == 0:
+            self.pc = 1
+            self.x = x2
+        elif self.pc == 1:
+            if pc2 == 0 or self.x != x2:
+                self.pc = 2
+        elif self.pc == 2:
+            self.pc = 0
+
+
+class P2:
+    pc: int
+    x: bool
+
+    def __init__(self, x: bool) -&gt; None:
+        self.pc = 0
+        self.x = x
+
+    def advance(self, pc1: int, x1: bool) -&gt; None:
+        if self.pc == 0:
+            self.pc = 1
+            self.x = not x1
+        elif self.pc == 1:
+            if pc1 == 0 or self.x == x1:
+                self.pc = 2
+        elif self.pc == 2:
+            self.pc = 0
+
+
+class State:
+    &quot;&quot;&quot;Property schema; each coordinate is owned by exactly one component.&quot;&quot;&quot;
+    pc1: int
+    pc2: int
+    x1: bool
+    x2: bool
+
+
+def mutual_exclusion(state: State) -&gt; bool:
+    return not (state.pc1 == 2 and state.pc2 == 2)
+
+
+def control_locations(state: State) -&gt; bool:
+    return 0 &lt;= state.pc1 &lt;= 2 and 0 &lt;= state.pc2 &lt;= 2
+
+
+def priority(state: State) -&gt; bool:
+    return ((state.pc1 != 2 or state.pc2 != 1 or state.x1 != state.x2)
+            and (state.pc2 != 2 or state.pc1 != 1 or state.x1 == state.x2))
+
+
+def paper_initial(state: State) -&gt; bool:
+    # The flag variables are arbitrary Booleans, as in the paper.
+    return state.pc1 == 0 and state.pc2 == 0
+
+
+def paper_round(before: State, after: State) -&gt; bool:
+    &quot;&quot;&quot;Independent relational statement of the two atoms, including sleep.&quot;&quot;&quot;
+    first = ((after.pc1 == before.pc1 and after.x1 == before.x1)
+             or (before.pc1 == 0 and after.pc1 == 1 and after.x1 == before.x2)
+             or (before.pc1 == 1 and (before.pc2 == 0 or before.x1 != before.x2)
+                 and after.pc1 == 2 and after.x1 == before.x1)
+             or (before.pc1 == 2 and after.pc1 == 0 and after.x1 == before.x1))
+    second = ((after.pc2 == before.pc2 and after.x2 == before.x2)
+              or (before.pc2 == 0 and after.pc2 == 1 and after.x2 == (not before.x1))
+              or (before.pc2 == 1 and (before.pc1 == 0 or before.x1 == before.x2)
+                  and after.pc2 == 2 and after.x2 == before.x2)
+              or (before.pc2 == 2 and after.pc2 == 0 and after.x2 == before.x2))
+    return first and second
+
+
+peterson = Composition(
+    State,
+    [Component(P1, [P1.advance], controls={&quot;pc&quot;: &quot;pc1&quot;, &quot;x&quot;: &quot;x1&quot;},
+               inputs={&quot;pc2&quot;: &quot;pc2&quot;, &quot;x2&quot;: &quot;x2&quot;}, stutter=True),
+     Component(P2, [P2.advance], controls={&quot;pc&quot;: &quot;pc2&quot;, &quot;x&quot;: &quot;x2&quot;},
+               inputs={&quot;pc1&quot;: &quot;pc1&quot;, &quot;x1&quot;: &quot;x1&quot;}, stutter=True)],
+    invariants=[mutual_exclusion], strengthening=[control_locations, priority],
+    initial_relation=paper_initial, step_relation=paper_round,
+)
+</code></pre><h2>Complete accepted evidence</h2><details><summary>InitialRelation.lean</summary><pre><code>import Translation
+open RMVerify RMVerify.Reactive Verified
+set_option linter.all false
+set_option maxRecDepth 100000
+set_option maxHeartbeats 2000000
+theorem relation (s : State) : composed.initial s ↔ specified_initial s := by
+  cases s
+  simp_all (config := {failIfUnchanged := false}) [source0, graph_eval0, source1, graph_eval1, source2, graph_eval2, source3, graph_eval3, source4, graph_eval4, source5, graph_eval5, source6, graph_eval6, source7, graph_eval7, source8, graph_eval8, source9, graph_eval9, source10, graph_eval10, graph_evaln0, graph_evaln1, graph_evaln2, graph_evaln3, graph_evaln4, graph_evaln5, graph_evaln6, graph_evaln7, encodeState, atom0, atom1, part0, part1, composed, Reactive.Module.parallel, Reactive.Module.initial, Reactive.Module.step, inv0, inv1, inv2, safe, specified_initial, specified_step, RMVerify.environment, RMVerify.update, RMVerify.Expr.eval, RMVerify.Op.eval, RMVerify.Stmt.exec, List.range_succ]
+  all_goals (repeat&#x27; (first | omega | split &lt;;&gt; simp_all (config := {failIfUnchanged := false}) [RMVerify.environment, RMVerify.update, RMVerify.Expr.eval, RMVerify.Op.eval, RMVerify.Stmt.exec, List.range_succ]))
+  all_goals first | omega | grind [RMVerify.flag]
+theorem source_relation (s : State) : sourceModule.initial s ↔ source_specified_initial s := by
+  simpa only [source_module_eq, specified_initial_agreement] using relation s
+#print axioms relation
+#print axioms source_relation
+</code></pre></details><details><summary>Invariants.lean</summary><pre><code>import Translation
+open RMVerify RMVerify.Reactive Verified
+set_option linter.all false
+set_option maxRecDepth 100000
+set_option maxHeartbeats 2000000
+theorem invariant : ∀ s, Reactive.Reachable composed s → safe s := by
+  apply Reactive.invariant_of_induction
+  · intro s hs
+    rcases s with ⟨s0, s1, s2, s3⟩
+    cases s2 &lt;;&gt; cases s3
+    all_goals
+      simp (config := {failIfUnchanged := false}) [source0, graph_eval0, source1, graph_eval1, source2, graph_eval2, source3, graph_eval3, source4, graph_eval4, source5, graph_eval5, source6, graph_eval6, source7, graph_eval7, source8, graph_eval8, source9, graph_eval9, source10, graph_eval10, graph_evaln0, graph_evaln1, graph_evaln2, graph_evaln3, graph_evaln4, graph_evaln5, graph_evaln6, graph_evaln7, encodeState, atom0, atom1, part0, part1, composed, Reactive.Module.parallel, Reactive.Module.initial, Reactive.Module.step, inv0, inv1, inv2, safe, specified_initial, specified_step, RMVerify.environment, RMVerify.update, RMVerify.Expr.eval, RMVerify.Op.eval, RMVerify.Stmt.exec, List.range_succ] at *
+      all_goals (repeat&#x27; (first | omega | split &lt;;&gt; simp_all (config := {failIfUnchanged := false}) [RMVerify.environment, RMVerify.update, RMVerify.Expr.eval, RMVerify.Op.eval, RMVerify.Stmt.exec, List.range_succ]))
+      all_goals first | omega | grind [RMVerify.flag]
+  · intro s t hs ht
+    rcases s with ⟨s0, s1, s2, s3⟩
+    rcases t with ⟨t0, t1, t2, t3⟩
+    cases s2 &lt;;&gt; cases s3 &lt;;&gt; cases t2 &lt;;&gt; cases t3
+    all_goals
+      simp (config := {failIfUnchanged := false}) [source0, graph_eval0, source1, graph_eval1, source2, graph_eval2, source3, graph_eval3, source4, graph_eval4, source5, graph_eval5, source6, graph_eval6, source7, graph_eval7, source8, graph_eval8, source9, graph_eval9, source10, graph_eval10, graph_evaln0, graph_evaln1, graph_evaln2, graph_evaln3, graph_evaln4, graph_evaln5, graph_evaln6, graph_evaln7, encodeState, atom0, atom1, part0, part1, composed, Reactive.Module.parallel, Reactive.Module.initial, Reactive.Module.step, inv0, inv1, inv2, safe, specified_initial, specified_step, RMVerify.environment, RMVerify.update, RMVerify.Expr.eval, RMVerify.Op.eval, RMVerify.Stmt.exec, List.range_succ] at *
+      all_goals (repeat&#x27; (first | omega | split &lt;;&gt; simp_all (config := {failIfUnchanged := false}) [RMVerify.environment, RMVerify.update, RMVerify.Expr.eval, RMVerify.Op.eval, RMVerify.Stmt.exec, List.range_succ]))
+      all_goals first | omega | grind [RMVerify.flag]
+theorem always_safe (states : Nat → State) (start : composed.initial (states 0))
+    (round : ∀ n, composed.step (states n) (states (n+1))) : ∀ n, safe (states n) :=
+  Reactive.invariant_always composed safe invariant states start round
+theorem source_invariant : ∀ s, Reactive.Reachable sourceModule s → sourceSafe s := by
+  simpa only [source_module_eq, sourceSafe, safe, inv_agreement0, inv_agreement1, inv_agreement2] using invariant
+#print axioms invariant
+#print axioms always_safe
+#print axioms source_invariant
+</code></pre></details><details><summary>Semantics.lean</summary><pre><code>import Std
+
+namespace RMVerify
+abbrev Env := Nat → Int
+
+def flag (b : Bool) : Int := if b then 1 else 0
+
+@[simp] theorem flag_false : flag false = 0 := rfl
+@[simp] theorem flag_true : flag true = 1 := rfl
+
+-- Keep Boolean encodings symbolic instead of expanding a conditional for
+-- every nested Boolean operator during invariant simplification.
+@[simp] theorem flag_eq_zero (b : Bool) : flag b = 0 ↔ b = false := by
+  cases b &lt;;&gt; decide
+
+@[simp] theorem flag_eq_one (b : Bool) : flag b = 1 ↔ b = true := by
+  cases b &lt;;&gt; decide
+
+@[simp] theorem flag_eq_flag (a b : Bool) : flag a = flag b ↔ a = b := by
+  cases a &lt;;&gt; cases b &lt;;&gt; decide
+
+@[simp] theorem flag_test (b : Bool) : (flag b != 0) = b := by
+  cases b &lt;;&gt; rfl
+
+@[simp] theorem flag_valid (b : Bool) : flag b = 0 ∨ flag b = 1 := by
+  cases b &lt;;&gt; decide
+
+def update (env : Env) (i : Nat) (v : Int) : Env :=
+  fun j =&gt; if j = i then v else env j
+
+def environment (xs : List Int) : Env := fun i =&gt; xs[i]?.getD 0
+
+inductive Op where
+  | add | sub | mul | eq | ne | lt | le | gt | ge | and | or
+  deriving Repr, DecidableEq
+
+def Op.eval : Op → Int → Int → Int
+  | .add, a, b =&gt; a + b
+  | .sub, a, b =&gt; a - b
+  | .mul, a, b =&gt; a * b
+  | .eq, a, b =&gt; flag (a == b)
+  | .ne, a, b =&gt; flag (a != b)
+  | .lt, a, b =&gt; flag (a &lt; b)
+  | .le, a, b =&gt; flag (a ≤ b)
+  | .gt, a, b =&gt; flag (a &gt; b)
+  | .ge, a, b =&gt; flag (a ≥ b)
+  | .and, a, b =&gt; flag (a != 0 &amp;&amp; b != 0)
+  | .or, a, b =&gt; flag (a != 0 || b != 0)
+
+inductive Expr where
+  | lit (value : Int)
+  | var (slot : Nat)
+  | bin (op : Op) (left right : Expr)
+  | ite (condition yes no : Expr)
+  deriving Repr
+
+def Expr.eval (env : Env) : Expr → Int
+  | .lit n =&gt; n
+  | .var n =&gt; env n
+  | .bin op a b =&gt; op.eval (a.eval env) (b.eval env)
+  | .ite c a b =&gt; if c.eval env != 0 then a.eval env else b.eval env
+
+/-- Structured statements retain the source&#x27;s sequencing and early returns. -/
+inductive Stmt where
+  | skip
+  | assign (slot : Nat) (value : Expr)
+  | seq (first rest : Stmt)
+  | branch (condition : Expr) (yes no : Stmt)
+  | ret (value : Expr)
+  deriving Repr
+
+inductive Outcome where
+  | next (env : Env)
+  | returned (env : Env) (value : Int)
+
+def Outcome.bind (outcome : Outcome) (next : Env → Outcome) : Outcome :=
+  match outcome with
+  | .next env =&gt; next env
+  | .returned env value =&gt; .returned env value
+
+def Stmt.exec (env : Env) : Stmt → Outcome
+  | .skip =&gt; .next env
+  | .assign n e =&gt; .next (update env n (e.eval env))
+  | .seq a b =&gt; (a.exec env).bind (fun env&#x27; =&gt; b.exec env&#x27;)
+  | .branch c a b =&gt; if c.eval env != 0 then a.exec env else b.exec env
+  | .ret e =&gt; .returned env (e.eval env)
+
+def Outcome.outputs (fields : Nat) : Outcome → List Int
+  | .next env =&gt; (List.range fields).map env ++ [0]
+  | .returned env result =&gt; (List.range fields).map env ++ [result]
+
+@[simp] theorem Outcome.bind_next (env : Env) (f : Env → Outcome) :
+    (Outcome.next env).bind f = f env := rfl
+
+@[simp] theorem Outcome.bind_returned (env : Env) (v : Int) (f : Env → Outcome) :
+    (Outcome.returned env v).bind f = .returned env v := rfl
+
+@[simp] theorem Outcome.outputs_next (env : Env) (n : Nat) :
+    (Outcome.next env).outputs n = (List.range n).map env ++ [0] := rfl
+
+@[simp] theorem Outcome.outputs_returned (env : Env) (v : Int) (n : Nat) :
+    (Outcome.returned env v).outputs n = (List.range n).map env ++ [v] := rfl
+
+@[simp] theorem Outcome.bind_ite (p : Prop) [Decidable p] (a b : Outcome) (f : Env → Outcome) :
+    (if p then a else b).bind f = if p then a.bind f else b.bind f := by
+  by_cases h : p &lt;;&gt; simp [h]
+
+@[simp] theorem Outcome.outputs_ite (p : Prop) [Decidable p] (a b : Outcome) (n : Nat) :
+    (if p then a else b).outputs n = if p then a.outputs n else b.outputs n := by
+  by_cases h : p &lt;;&gt; simp [h]
+
+/-- Independent ordered-wire execution; it does not call the source interpreter. -/
+def execute (cursor : Nat) (terms : List Expr) (env : Env) : Env :=
+  match terms with
+  | [] =&gt; env
+  | term :: rest =&gt; execute (cursor + 1) rest (update env cursor (term.eval env))
+
+structure Graph where
+  inputs : Nat
+  terms : List Expr
+  outputs : List Nat
+
+def Graph.run (g : Graph) (env : Env) : List Int :=
+  g.outputs.map (execute g.inputs g.terms env)
+
+structure Model (State Action : Type) where
+  initial : State
+  step : State → Action → State
+
+inductive Reachable (m : Model State Action) : State → Prop where
+  | initial : Reachable m m.initial
+  | step : Reachable m s → Reachable m (m.step s action)
+
+theorem invariant_of_induction (m : Model State Action) (p : State → Prop)
+    (initial : p m.initial)
+    (preserved : ∀ s action, p s → p (m.step s action)) :
+    ∀ s, Reachable m s → p s := by
+  intro s h
+  induction h with
+  | initial =&gt; exact initial
+  | step _ ih =&gt; exact preserved _ _ ih
+
+theorem invariant_always (m : Model State Action) (p : State → Prop)
+    (safe : ∀ s, Reachable m s → p s)
+    (states : Nat → State) (actions : Nat → Action)
+    (start : states 0 = m.initial)
+    (round : ∀ n, states (n+1) = m.step (states n) (actions n)) :
+    ∀ n, p (states n) := by
+  intro n
+  apply safe
+  induction n with
+  | zero =&gt; rw [start]; exact .initial
+  | succ n ih =&gt; rw [round]; exact .step ih
+
+end RMVerify
+
+namespace RMVerify.Reactive
+
+/-- A relational atom constrains only its controlled coordinates. Input ports
+    select either the old valuation (reads) or the candidate new one (awaits). -/
+structure Atom (State : Type) where
+  controls : List Nat
+  reads : List Nat
+  awaits : List Nat
+  initial : State → Prop
+  step : State → State → Prop
+
+structure Module (State : Type) where
+  atoms : List (Atom State)
+
+def Module.parallel (a b : Module State) : Module State := ⟨a.atoms ++ b.atoms⟩
+
+def Module.initial (m : Module State) (s : State) : Prop :=
+  ∀ a ∈ m.atoms, a.initial s
+
+def Module.step (m : Module State) (s t : State) : Prop :=
+  ∀ a ∈ m.atoms, a.step s t
+
+theorem initial_parallel (a b : Module State) (s : State) :
+    (a.parallel b).initial s ↔ a.initial s ∧ b.initial s := by
+  simp only [Module.initial, Module.parallel, List.mem_append]
+  constructor
+  · intro h; exact ⟨fun x hx =&gt; h x (.inl hx), fun x hx =&gt; h x (.inr hx)⟩
+  · rintro ⟨ha, hb⟩ x (hx | hx)
+    · exact ha x hx
+    · exact hb x hx
+
+theorem step_parallel (a b : Module State) (s t : State) :
+    (a.parallel b).step s t ↔ a.step s t ∧ b.step s t := by
+  simp only [Module.step, Module.parallel, List.mem_append]
+  constructor
+  · intro h; exact ⟨fun x hx =&gt; h x (.inl hx), fun x hx =&gt; h x (.inr hx)⟩
+  · rintro ⟨ha, hb⟩ x (hx | hx)
+    · exact ha x hx
+    · exact hb x hx
+
+def ordered (ready : List Nat) : List (Atom State) → Bool
+  | [] =&gt; true
+  | a :: rest =&gt; a.awaits.all ready.contains &amp;&amp; ordered (ready ++ a.controls) rest
+
+/-- Closed composition: exactly one owner per coordinate and an acyclic
+    await order. Old-value reads need no ordering restriction. -/
+def Module.wellFormed (m : Module State) (variables : Nat) : Bool :=
+  let owned := m.atoms.flatMap Atom.controls
+  owned.length == variables &amp;&amp; owned.eraseDups.length == variables &amp;&amp;
+  owned.all (fun v =&gt; v &lt; variables) &amp;&amp;
+  m.atoms.all (fun a =&gt; a.reads.all (fun v =&gt; v &lt; variables)) &amp;&amp; ordered [] m.atoms
+
+inductive Reachable (m : Module State) : State → Prop where
+  | initial : m.initial s → Reachable m s
+  | step : Reachable m s → m.step s t → Reachable m t
+
+theorem invariant_of_induction (m : Module State) (p : State → Prop)
+    (initial : ∀ s, m.initial s → p s)
+    (preserved : ∀ s t, p s → m.step s t → p t) :
+    ∀ s, Reachable m s → p s := by
+  intro s h
+  induction h with
+  | initial h =&gt; exact initial _ h
+  | step _ h ih =&gt; exact preserved _ _ ih h
+
+theorem invariant_always (m : Module State) (p : State → Prop)
+    (safe : ∀ s, Reachable m s → p s) (states : Nat → State)
+    (start : m.initial (states 0))
+    (round : ∀ n, m.step (states n) (states (n+1))) :
+    ∀ n, p (states n) := by
+  intro n
+  apply safe
+  induction n with
+  | zero =&gt; exact .initial start
+  | succ n ih =&gt; exact .step ih (round n)
+
+end RMVerify.Reactive
+</code></pre></details><details><summary>StepRelation.lean</summary><pre><code>import Translation
+open RMVerify RMVerify.Reactive Verified
+set_option linter.all false
+set_option maxRecDepth 100000
+set_option maxHeartbeats 2000000
+theorem relation (s t : State) : composed.step s t ↔ specified_step s t := by
+  cases s; cases t
+  simp_all (config := {failIfUnchanged := false}) [source0, graph_eval0, source1, graph_eval1, source2, graph_eval2, source3, graph_eval3, source4, graph_eval4, source5, graph_eval5, source6, graph_eval6, source7, graph_eval7, source8, graph_eval8, source9, graph_eval9, source10, graph_eval10, graph_evaln0, graph_evaln1, graph_evaln2, graph_evaln3, graph_evaln4, graph_evaln5, graph_evaln6, graph_evaln7, encodeState, atom0, atom1, part0, part1, composed, Reactive.Module.parallel, Reactive.Module.initial, Reactive.Module.step, inv0, inv1, inv2, safe, specified_initial, specified_step, RMVerify.environment, RMVerify.update, RMVerify.Expr.eval, RMVerify.Op.eval, RMVerify.Stmt.exec, List.range_succ]
+  all_goals (repeat&#x27; (first | omega | split &lt;;&gt; simp_all (config := {failIfUnchanged := false}) [RMVerify.environment, RMVerify.update, RMVerify.Expr.eval, RMVerify.Op.eval, RMVerify.Stmt.exec, List.range_succ]))
+  all_goals first | omega | grind [RMVerify.flag]
+theorem source_relation (s t : State) : sourceModule.step s t ↔ source_specified_step s t := by
+  simpa only [source_module_eq, specified_step_agreement] using relation s t
+#print axioms relation
+#print axioms source_relation
+</code></pre></details><details><summary>Translation.lean</summary><pre><code>import Semantics
+open RMVerify
+namespace Verified
+set_option linter.all false
+set_option maxRecDepth 100000
+set_option maxHeartbeats 1000000
+def source0 : Stmt := (.seq (.assign 2 (.lit (0))) (.seq (.assign 0 (.lit (0))) (.seq (.assign 1 (.var 2)) .skip)))
+def graph0 : Graph := ⟨0, [(.lit (0)), (.lit (0)), (.var 0), (.var 1), (.var 0)], [2, 3, 4]⟩
+theorem graph_eval0 (env : Env) : graph0.run env = [((.lit (0)) : Expr).eval env, ((.lit (0)) : Expr).eval env, ((.lit (0)) : Expr).eval env] := by rfl
+theorem translation0 (env : Env) (typed : True) :
+    (source0.exec env).outputs 2 = graph0.run env := by
+    simp only [source0, Stmt.exec, Outcome.bind_next, Outcome.bind_returned, Outcome.bind_ite, Outcome.outputs_ite, Outcome.outputs_next, Outcome.outputs_returned]
+    all_goals
+      simp_all (config := {failIfUnchanged := false}) [graph_eval0, RMVerify.environment, RMVerify.update, RMVerify.Expr.eval, RMVerify.Op.eval, RMVerify.Stmt.exec, List.range_succ]
+      all_goals (repeat&#x27; (first | omega | split &lt;;&gt; simp_all (config := {failIfUnchanged := false}) [RMVerify.environment, RMVerify.update, RMVerify.Expr.eval, RMVerify.Op.eval, RMVerify.Stmt.exec, List.range_succ]))
+      all_goals first | omega | grind [RMVerify.flag]
+#print axioms translation0
+def source1 : Stmt := (.seq (.assign 2 (.lit (1))) (.seq (.assign 0 (.lit (0))) (.seq (.assign 1 (.var 2)) .skip)))
+def graph1 : Graph := ⟨0, [(.lit (0)), (.lit (1)), (.var 0), (.var 1), (.var 0)], [2, 3, 4]⟩
+theorem graph_eval1 (env : Env) : graph1.run env = [((.lit (0)) : Expr).eval env, ((.lit (1)) : Expr).eval env, ((.lit (0)) : Expr).eval env] := by rfl
+theorem translation1 (env : Env) (typed : True) :
+    (source1.exec env).outputs 2 = graph1.run env := by
+    simp only [source1, Stmt.exec, Outcome.bind_next, Outcome.bind_returned, Outcome.bind_ite, Outcome.outputs_ite, Outcome.outputs_next, Outcome.outputs_returned]
+    all_goals
+      simp_all (config := {failIfUnchanged := false}) [graph_eval1, RMVerify.environment, RMVerify.update, RMVerify.Expr.eval, RMVerify.Op.eval, RMVerify.Stmt.exec, List.range_succ]
+      all_goals (repeat&#x27; (first | omega | split &lt;;&gt; simp_all (config := {failIfUnchanged := false}) [RMVerify.environment, RMVerify.update, RMVerify.Expr.eval, RMVerify.Op.eval, RMVerify.Stmt.exec, List.range_succ]))
+      all_goals first | omega | grind [RMVerify.flag]
+#print axioms translation1
+def source2 : Stmt := (.seq (.branch (.bin .eq (.var 0) (.lit (0))) (.seq (.assign 0 (.lit (1))) (.seq (.assign 1 (.var 3)) .skip)) (.seq (.branch (.bin .eq (.var 0) (.lit (1))) (.seq (.branch (.bin .or (.bin .eq (.var 2) (.lit (0))) (.bin .ne (.var 1) (.var 3))) (.seq (.assign 0 (.lit (2))) .skip) .skip) .skip) (.seq (.branch (.bin .eq (.var 0) (.lit (2))) (.seq (.assign 0 (.lit (0))) .skip) .skip) .skip)) .skip)) .skip)
+def graph2 : Graph := ⟨4, [(.lit (0)), (.bin .eq (.var 0) (.var 4)), (.lit (1)), (.bin .eq (.var 0) (.var 6)), (.bin .eq (.var 2) (.var 4)), (.ite (.var 3) (.lit (0)) (.lit (1))), (.ite (.var 1) (.var 9) (.var 3)), (.bin .or (.var 8) (.var 10)), (.lit (2)), (.ite (.var 11) (.var 12) (.var 0)), (.bin .eq (.var 0) (.var 12)), (.ite (.var 14) (.var 4) (.var 0)), (.ite (.var 7) (.var 13) (.var 15)), (.ite (.var 5) (.var 6) (.var 16)), (.ite (.var 5) (.var 3) (.var 1)), (.var 17), (.var 18), (.var 4)], [19, 20, 21]⟩
+theorem graph_eval2 (env : Env) : graph2.run env = [((.ite (.bin .eq (.var 0) (.lit (0))) (.lit (1)) (.ite (.bin .eq (.var 0) (.lit (1))) (.ite (.bin .or (.bin .eq (.var 2) (.lit (0))) (.ite (.var 1) (.ite (.var 3) (.lit (0)) (.lit (1))) (.var 3))) (.lit (2)) (.var 0)) (.ite (.bin .eq (.var 0) (.lit (2))) (.lit (0)) (.var 0)))) : Expr).eval env, ((.ite (.bin .eq (.var 0) (.lit (0))) (.var 3) (.var 1)) : Expr).eval env, ((.lit (0)) : Expr).eval env] := by rfl
+theorem translation2 (env : Env) (typed : (env 1 = 0 ∨ env 1 = 1) ∧ (env 3 = 0 ∨ env 3 = 1) ∧ True) :
+    (source2.exec env).outputs 2 = graph2.run env := by
+    simp only [source2, Stmt.exec, Outcome.bind_next, Outcome.bind_returned, Outcome.bind_ite, Outcome.outputs_ite, Outcome.outputs_next, Outcome.outputs_returned]
+    all_goals
+      simp_all (config := {failIfUnchanged := false}) [graph_eval2, RMVerify.environment, RMVerify.update, RMVerify.Expr.eval, RMVerify.Op.eval, RMVerify.Stmt.exec, List.range_succ]
+      all_goals (repeat&#x27; (first | omega | split &lt;;&gt; simp_all (config := {failIfUnchanged := false}) [RMVerify.environment, RMVerify.update, RMVerify.Expr.eval, RMVerify.Op.eval, RMVerify.Stmt.exec, List.range_succ]))
+      all_goals first | omega | grind [RMVerify.flag]
+#print axioms translation2
+def source3 : Stmt := (.seq (.assign 2 (.lit (0))) (.seq (.assign 0 (.lit (0))) (.seq (.assign 1 (.var 2)) .skip)))
+def graph3 : Graph := ⟨0, [(.lit (0)), (.lit (0)), (.var 0), (.var 1), (.var 0)], [2, 3, 4]⟩
+theorem graph_eval3 (env : Env) : graph3.run env = [((.lit (0)) : Expr).eval env, ((.lit (0)) : Expr).eval env, ((.lit (0)) : Expr).eval env] := by rfl
+theorem translation3 (env : Env) (typed : True) :
+    (source3.exec env).outputs 2 = graph3.run env := by
+    simp only [source3, Stmt.exec, Outcome.bind_next, Outcome.bind_returned, Outcome.bind_ite, Outcome.outputs_ite, Outcome.outputs_next, Outcome.outputs_returned]
+    all_goals
+      simp_all (config := {failIfUnchanged := false}) [graph_eval3, RMVerify.environment, RMVerify.update, RMVerify.Expr.eval, RMVerify.Op.eval, RMVerify.Stmt.exec, List.range_succ]
+      all_goals (repeat&#x27; (first | omega | split &lt;;&gt; simp_all (config := {failIfUnchanged := false}) [RMVerify.environment, RMVerify.update, RMVerify.Expr.eval, RMVerify.Op.eval, RMVerify.Stmt.exec, List.range_succ]))
+      all_goals first | omega | grind [RMVerify.flag]
+#print axioms translation3
+def source4 : Stmt := (.seq (.assign 2 (.lit (1))) (.seq (.assign 0 (.lit (0))) (.seq (.assign 1 (.var 2)) .skip)))
+def graph4 : Graph := ⟨0, [(.lit (0)), (.lit (1)), (.var 0), (.var 1), (.var 0)], [2, 3, 4]⟩
+theorem graph_eval4 (env : Env) : graph4.run env = [((.lit (0)) : Expr).eval env, ((.lit (1)) : Expr).eval env, ((.lit (0)) : Expr).eval env] := by rfl
+theorem translation4 (env : Env) (typed : True) :
+    (source4.exec env).outputs 2 = graph4.run env := by
+    simp only [source4, Stmt.exec, Outcome.bind_next, Outcome.bind_returned, Outcome.bind_ite, Outcome.outputs_ite, Outcome.outputs_next, Outcome.outputs_returned]
+    all_goals
+      simp_all (config := {failIfUnchanged := false}) [graph_eval4, RMVerify.environment, RMVerify.update, RMVerify.Expr.eval, RMVerify.Op.eval, RMVerify.Stmt.exec, List.range_succ]
+      all_goals (repeat&#x27; (first | omega | split &lt;;&gt; simp_all (config := {failIfUnchanged := false}) [RMVerify.environment, RMVerify.update, RMVerify.Expr.eval, RMVerify.Op.eval, RMVerify.Stmt.exec, List.range_succ]))
+      all_goals first | omega | grind [RMVerify.flag]
+#print axioms translation4
+def source5 : Stmt := (.seq (.branch (.bin .eq (.var 0) (.lit (0))) (.seq (.assign 0 (.lit (1))) (.seq (.assign 1 (.bin .eq (.var 3) (.lit (0)))) .skip)) (.seq (.branch (.bin .eq (.var 0) (.lit (1))) (.seq (.branch (.bin .or (.bin .eq (.var 2) (.lit (0))) (.bin .eq (.var 1) (.var 3))) (.seq (.assign 0 (.lit (2))) .skip) .skip) .skip) (.seq (.branch (.bin .eq (.var 0) (.lit (2))) (.seq (.assign 0 (.lit (0))) .skip) .skip) .skip)) .skip)) .skip)
+def graph5 : Graph := ⟨4, [(.lit (0)), (.bin .eq (.var 0) (.var 4)), (.lit (1)), (.bin .eq (.var 0) (.var 6)), (.bin .eq (.var 2) (.var 4)), (.ite (.var 3) (.lit (0)) (.lit (1))), (.ite (.var 1) (.var 3) (.var 9)), (.bin .or (.var 8) (.var 10)), (.lit (2)), (.ite (.var 11) (.var 12) (.var 0)), (.bin .eq (.var 0) (.var 12)), (.ite (.var 14) (.var 4) (.var 0)), (.ite (.var 7) (.var 13) (.var 15)), (.ite (.var 5) (.var 6) (.var 16)), (.lit (0)), (.ite (.var 18) (.lit (0)) (.lit (1))), (.ite (.var 3) (.var 18) (.var 19)), (.ite (.var 5) (.var 20) (.var 1)), (.var 17), (.var 21), (.var 4)], [22, 23, 24]⟩
+theorem graph_eval5 (env : Env) : graph5.run env = [((.ite (.bin .eq (.var 0) (.lit (0))) (.lit (1)) (.ite (.bin .eq (.var 0) (.lit (1))) (.ite (.bin .or (.bin .eq (.var 2) (.lit (0))) (.ite (.var 1) (.var 3) (.ite (.var 3) (.lit (0)) (.lit (1))))) (.lit (2)) (.var 0)) (.ite (.bin .eq (.var 0) (.lit (2))) (.lit (0)) (.var 0)))) : Expr).eval env, ((.ite (.bin .eq (.var 0) (.lit (0))) (.ite (.var 3) (.lit (0)) (.ite (.lit (0)) (.lit (0)) (.lit (1)))) (.var 1)) : Expr).eval env, ((.lit (0)) : Expr).eval env] := by rfl
+theorem translation5 (env : Env) (typed : (env 1 = 0 ∨ env 1 = 1) ∧ (env 3 = 0 ∨ env 3 = 1) ∧ True) :
+    (source5.exec env).outputs 2 = graph5.run env := by
+    simp only [source5, Stmt.exec, Outcome.bind_next, Outcome.bind_returned, Outcome.bind_ite, Outcome.outputs_ite, Outcome.outputs_next, Outcome.outputs_returned]
+    all_goals
+      simp_all (config := {failIfUnchanged := false}) [graph_eval5, RMVerify.environment, RMVerify.update, RMVerify.Expr.eval, RMVerify.Op.eval, RMVerify.Stmt.exec, List.range_succ]
+      all_goals (repeat&#x27; (first | omega | split &lt;;&gt; simp_all (config := {failIfUnchanged := false}) [RMVerify.environment, RMVerify.update, RMVerify.Expr.eval, RMVerify.Op.eval, RMVerify.Stmt.exec, List.range_succ]))
+      all_goals first | omega | grind [RMVerify.flag]
+#print axioms translation5
+def source6 : Stmt := (.seq (.ret (.bin .eq (.bin .and (.bin .eq (.var 0) (.lit (2))) (.bin .eq (.var 1) (.lit (2)))) (.lit (0)))) .skip)
+def graph6 : Graph := ⟨4, [(.lit (2)), (.bin .eq (.var 0) (.var 4)), (.bin .eq (.var 1) (.var 4)), (.bin .and (.var 5) (.var 6)), (.lit (0)), (.ite (.var 8) (.lit (0)) (.lit (1))), (.ite (.var 7) (.var 8) (.var 9)), (.var 10)], [11]⟩
+theorem graph_eval6 (env : Env) : graph6.run env = [((.ite (.bin .and (.bin .eq (.var 0) (.lit (2))) (.bin .eq (.var 1) (.lit (2)))) (.lit (0)) (.ite (.lit (0)) (.lit (0)) (.lit (1)))) : Expr).eval env] := by rfl
+theorem translation6 (env : Env) (typed : (env 2 = 0 ∨ env 2 = 1) ∧ (env 3 = 0 ∨ env 3 = 1) ∧ True) :
+    (source6.exec env).outputs 0 = graph6.run env := by
+    simp only [source6, Stmt.exec, Outcome.bind_next, Outcome.bind_returned, Outcome.bind_ite, Outcome.outputs_ite, Outcome.outputs_next, Outcome.outputs_returned]
+    all_goals
+      simp_all (config := {failIfUnchanged := false}) [graph_eval6, RMVerify.environment, RMVerify.update, RMVerify.Expr.eval, RMVerify.Op.eval, RMVerify.Stmt.exec, List.range_succ]
+      all_goals (repeat&#x27; (first | omega | split &lt;;&gt; simp_all (config := {failIfUnchanged := false}) [RMVerify.environment, RMVerify.update, RMVerify.Expr.eval, RMVerify.Op.eval, RMVerify.Stmt.exec, List.range_succ]))
+      all_goals first | omega | grind [RMVerify.flag]
+#print axioms translation6
+def source7 : Stmt := (.seq (.ret (.bin .and (.bin .and (.bin .le (.lit (0)) (.var 0)) (.bin .le (.var 0) (.lit (2)))) (.bin .and (.bin .le (.lit (0)) (.var 1)) (.bin .le (.var 1) (.lit (2)))))) .skip)
+def graph7 : Graph := ⟨4, [(.lit (0)), (.bin .le (.var 4) (.var 0)), (.lit (2)), (.bin .le (.var 0) (.var 6)), (.bin .and (.var 5) (.var 7)), (.bin .le (.var 4) (.var 1)), (.bin .le (.var 1) (.var 6)), (.bin .and (.var 9) (.var 10)), (.bin .and (.var 8) (.var 11)), (.var 12)], [13]⟩
+theorem graph_eval7 (env : Env) : graph7.run env = [((.bin .and (.bin .and (.bin .le (.lit (0)) (.var 0)) (.bin .le (.var 0) (.lit (2)))) (.bin .and (.bin .le (.lit (0)) (.var 1)) (.bin .le (.var 1) (.lit (2))))) : Expr).eval env] := by rfl
+theorem translation7 (env : Env) (typed : (env 2 = 0 ∨ env 2 = 1) ∧ (env 3 = 0 ∨ env 3 = 1) ∧ True) :
+    (source7.exec env).outputs 0 = graph7.run env := by
+    simp only [source7, Stmt.exec, Outcome.bind_next, Outcome.bind_returned, Outcome.bind_ite, Outcome.outputs_ite, Outcome.outputs_next, Outcome.outputs_returned]
+    all_goals
+      simp_all (config := {failIfUnchanged := false}) [graph_eval7, RMVerify.environment, RMVerify.update, RMVerify.Expr.eval, RMVerify.Op.eval, RMVerify.Stmt.exec, List.range_succ]
+      all_goals (repeat&#x27; (first | omega | split &lt;;&gt; simp_all (config := {failIfUnchanged := false}) [RMVerify.environment, RMVerify.update, RMVerify.Expr.eval, RMVerify.Op.eval, RMVerify.Stmt.exec, List.range_succ]))
+      all_goals first | omega | grind [RMVerify.flag]
+#print axioms translation7
+def source8 : Stmt := (.seq (.ret (.bin .and (.bin .or (.bin .or (.bin .ne (.var 0) (.lit (2))) (.bin .ne (.var 1) (.lit (1)))) (.bin .ne (.var 2) (.var 3))) (.bin .or (.bin .or (.bin .ne (.var 1) (.lit (2))) (.bin .ne (.var 0) (.lit (1)))) (.bin .eq (.var 2) (.var 3))))) .skip)
+def graph8 : Graph := ⟨4, [(.lit (2)), (.bin .ne (.var 0) (.var 4)), (.lit (1)), (.bin .ne (.var 1) (.var 6)), (.bin .or (.var 5) (.var 7)), (.ite (.var 3) (.lit (0)) (.lit (1))), (.ite (.var 2) (.var 9) (.var 3)), (.bin .or (.var 8) (.var 10)), (.bin .ne (.var 1) (.var 4)), (.bin .ne (.var 0) (.var 6)), (.bin .or (.var 12) (.var 13)), (.ite (.var 3) (.lit (0)) (.lit (1))), (.ite (.var 2) (.var 3) (.var 15)), (.bin .or (.var 14) (.var 16)), (.bin .and (.var 11) (.var 17)), (.var 18)], [19]⟩
+theorem graph_eval8 (env : Env) : graph8.run env = [((.bin .and (.bin .or (.bin .or (.bin .ne (.var 0) (.lit (2))) (.bin .ne (.var 1) (.lit (1)))) (.ite (.var 2) (.ite (.var 3) (.lit (0)) (.lit (1))) (.var 3))) (.bin .or (.bin .or (.bin .ne (.var 1) (.lit (2))) (.bin .ne (.var 0) (.lit (1)))) (.ite (.var 2) (.var 3) (.ite (.var 3) (.lit (0)) (.lit (1)))))) : Expr).eval env] := by rfl
+theorem translation8 (env : Env) (typed : (env 2 = 0 ∨ env 2 = 1) ∧ (env 3 = 0 ∨ env 3 = 1) ∧ True) :
+    (source8.exec env).outputs 0 = graph8.run env := by
+    simp only [source8, Stmt.exec, Outcome.bind_next, Outcome.bind_returned, Outcome.bind_ite, Outcome.outputs_ite, Outcome.outputs_next, Outcome.outputs_returned]
+    all_goals
+      simp_all (config := {failIfUnchanged := false}) [graph_eval8, RMVerify.environment, RMVerify.update, RMVerify.Expr.eval, RMVerify.Op.eval, RMVerify.Stmt.exec, List.range_succ]
+      all_goals (repeat&#x27; (first | omega | split &lt;;&gt; simp_all (config := {failIfUnchanged := false}) [RMVerify.environment, RMVerify.update, RMVerify.Expr.eval, RMVerify.Op.eval, RMVerify.Stmt.exec, List.range_succ]))
+      all_goals first | omega | grind [RMVerify.flag]
+#print axioms translation8
+def source9 : Stmt := (.seq (.ret (.bin .and (.bin .eq (.var 0) (.lit (0))) (.bin .eq (.var 1) (.lit (0))))) .skip)
+def graph9 : Graph := ⟨4, [(.lit (0)), (.bin .eq (.var 0) (.var 4)), (.bin .eq (.var 1) (.var 4)), (.bin .and (.var 5) (.var 6)), (.var 7)], [8]⟩
+theorem graph_eval9 (env : Env) : graph9.run env = [((.bin .and (.bin .eq (.var 0) (.lit (0))) (.bin .eq (.var 1) (.lit (0)))) : Expr).eval env] := by rfl
+theorem translation9 (env : Env) (typed : (env 2 = 0 ∨ env 2 = 1) ∧ (env 3 = 0 ∨ env 3 = 1) ∧ True) :
+    (source9.exec env).outputs 0 = graph9.run env := by
+    simp only [source9, Stmt.exec, Outcome.bind_next, Outcome.bind_returned, Outcome.bind_ite, Outcome.outputs_ite, Outcome.outputs_next, Outcome.outputs_returned]
+    all_goals
+      simp_all (config := {failIfUnchanged := false}) [graph_eval9, RMVerify.environment, RMVerify.update, RMVerify.Expr.eval, RMVerify.Op.eval, RMVerify.Stmt.exec, List.range_succ]
+      all_goals (repeat&#x27; (first | omega | split &lt;;&gt; simp_all (config := {failIfUnchanged := false}) [RMVerify.environment, RMVerify.update, RMVerify.Expr.eval, RMVerify.Op.eval, RMVerify.Stmt.exec, List.range_succ]))
+      all_goals first | omega | grind [RMVerify.flag]
+#print axioms translation9
+def source10 : Stmt := (.seq .skip (.seq (.assign 8 (.bin .or (.bin .or (.bin .or (.bin .and (.bin .eq (.var 4) (.var 0)) (.bin .eq (.var 6) (.var 2))) (.bin .and (.bin .and (.bin .eq (.var 0) (.lit (0))) (.bin .eq (.var 4) (.lit (1)))) (.bin .eq (.var 6) (.var 3)))) (.bin .and (.bin .and (.bin .and (.bin .eq (.var 0) (.lit (1))) (.bin .or (.bin .eq (.var 1) (.lit (0))) (.bin .ne (.var 2) (.var 3)))) (.bin .eq (.var 4) (.lit (2)))) (.bin .eq (.var 6) (.var 2)))) (.bin .and (.bin .and (.bin .eq (.var 0) (.lit (2))) (.bin .eq (.var 4) (.lit (0)))) (.bin .eq (.var 6) (.var 2))))) (.seq (.assign 9 (.bin .or (.bin .or (.bin .or (.bin .and (.bin .eq (.var 5) (.var 1)) (.bin .eq (.var 7) (.var 3))) (.bin .and (.bin .and (.bin .eq (.var 1) (.lit (0))) (.bin .eq (.var 5) (.lit (1)))) (.bin .eq (.var 7) (.bin .eq (.var 2) (.lit (0)))))) (.bin .and (.bin .and (.bin .and (.bin .eq (.var 1) (.lit (1))) (.bin .or (.bin .eq (.var 0) (.lit (0))) (.bin .eq (.var 2) (.var 3)))) (.bin .eq (.var 5) (.lit (2)))) (.bin .eq (.var 7) (.var 3)))) (.bin .and (.bin .and (.bin .eq (.var 1) (.lit (2))) (.bin .eq (.var 5) (.lit (0)))) (.bin .eq (.var 7) (.var 3))))) (.seq (.ret (.bin .and (.var 8) (.var 9))) .skip))))
+def graph10 : Graph := ⟨8, [(.bin .eq (.var 4) (.var 0)), (.ite (.var 2) (.lit (0)) (.lit (1))), (.ite (.var 6) (.var 2) (.var 9)), (.bin .and (.var 8) (.var 10)), (.lit (0)), (.bin .eq (.var 0) (.var 12)), (.lit (1)), (.bin .eq (.var 4) (.var 14)), (.bin .and (.var 13) (.var 15)), (.ite (.var 3) (.lit (0)) (.lit (1))), (.ite (.var 6) (.var 3) (.var 17)), (.bin .and (.var 16) (.var 18)), (.bin .or (.var 11) (.var 19)), (.bin .eq (.var 0) (.var 14)), (.bin .eq (.var 1) (.var 12)), (.ite (.var 3) (.lit (0)) (.lit (1))), (.ite (.var 2) (.var 23) (.var 3)), (.bin .or (.var 22) (.var 24)), (.bin .and (.var 21) (.var 25)), (.lit (2)), (.bin .eq (.var 4) (.var 27)), (.bin .and (.var 26) (.var 28)), (.bin .and (.var 29) (.var 10)), (.bin .or (.var 20) (.var 30)), (.bin .eq (.var 0) (.var 27)), (.bin .eq (.var 4) (.var 12)), (.bin .and (.var 32) (.var 33)), (.bin .and (.var 34) (.var 10)), (.bin .or (.var 31) (.var 35)), (.bin .eq (.var 5) (.var 1)), (.ite (.var 3) (.lit (0)) (.lit (1))), (.ite (.var 7) (.var 3) (.var 38)), (.bin .and (.var 37) (.var 39)), (.bin .eq (.var 5) (.var 14)), (.bin .and (.var 22) (.var 41)), (.lit (0)), (.ite (.var 43) (.lit (0)) (.lit (1))), (.ite (.var 2) (.var 43) (.var 44)), (.ite (.var 45) (.lit (0)) (.lit (1))), (.ite (.var 7) (.var 45) (.var 46)), (.bin .and (.var 42) (.var 47)), (.bin .or (.var 40) (.var 48)), (.bin .eq (.var 1) (.var 14)), (.ite (.var 3) (.lit (0)) (.lit (1))), (.ite (.var 2) (.var 3) (.var 51)), (.bin .or (.var 13) (.var 52)), (.bin .and (.var 50) (.var 53)), (.bin .eq (.var 5) (.var 27)), (.bin .and (.var 54) (.var 55)), (.bin .and (.var 56) (.var 39)), (.bin .or (.var 49) (.var 57)), (.bin .eq (.var 1) (.var 27)), (.bin .eq (.var 5) (.var 12)), (.bin .and (.var 59) (.var 60)), (.bin .and (.var 61) (.var 39)), (.bin .or (.var 58) (.var 62)), (.bin .and (.var 36) (.var 63)), (.var 64)], [65]⟩
+theorem graph_eval10 (env : Env) : graph10.run env = [((.bin .and (.bin .or (.bin .or (.bin .or (.bin .and (.bin .eq (.var 4) (.var 0)) (.ite (.var 6) (.var 2) (.ite (.var 2) (.lit (0)) (.lit (1))))) (.bin .and (.bin .and (.bin .eq (.var 0) (.lit (0))) (.bin .eq (.var 4) (.lit (1)))) (.ite (.var 6) (.var 3) (.ite (.var 3) (.lit (0)) (.lit (1)))))) (.bin .and (.bin .and (.bin .and (.bin .eq (.var 0) (.lit (1))) (.bin .or (.bin .eq (.var 1) (.lit (0))) (.ite (.var 2) (.ite (.var 3) (.lit (0)) (.lit (1))) (.var 3)))) (.bin .eq (.var 4) (.lit (2)))) (.ite (.var 6) (.var 2) (.ite (.var 2) (.lit (0)) (.lit (1)))))) (.bin .and (.bin .and (.bin .eq (.var 0) (.lit (2))) (.bin .eq (.var 4) (.lit (0)))) (.ite (.var 6) (.var 2) (.ite (.var 2) (.lit (0)) (.lit (1)))))) (.bin .or (.bin .or (.bin .or (.bin .and (.bin .eq (.var 5) (.var 1)) (.ite (.var 7) (.var 3) (.ite (.var 3) (.lit (0)) (.lit (1))))) (.bin .and (.bin .and (.bin .eq (.var 1) (.lit (0))) (.bin .eq (.var 5) (.lit (1)))) (.ite (.var 7) (.ite (.var 2) (.lit (0)) (.ite (.lit (0)) (.lit (0)) (.lit (1)))) (.ite (.ite (.var 2) (.lit (0)) (.ite (.lit (0)) (.lit (0)) (.lit (1)))) (.lit (0)) (.lit (1)))))) (.bin .and (.bin .and (.bin .and (.bin .eq (.var 1) (.lit (1))) (.bin .or (.bin .eq (.var 0) (.lit (0))) (.ite (.var 2) (.var 3) (.ite (.var 3) (.lit (0)) (.lit (1)))))) (.bin .eq (.var 5) (.lit (2)))) (.ite (.var 7) (.var 3) (.ite (.var 3) (.lit (0)) (.lit (1)))))) (.bin .and (.bin .and (.bin .eq (.var 1) (.lit (2))) (.bin .eq (.var 5) (.lit (0)))) (.ite (.var 7) (.var 3) (.ite (.var 3) (.lit (0)) (.lit (1))))))) : Expr).eval env] := by rfl
+theorem translation10 (env : Env) (typed : (env 2 = 0 ∨ env 2 = 1) ∧ (env 3 = 0 ∨ env 3 = 1) ∧ (env 6 = 0 ∨ env 6 = 1) ∧ (env 7 = 0 ∨ env 7 = 1) ∧ True) :
+    (source10.exec env).outputs 0 = graph10.run env := by
+    simp only [source10, Stmt.exec, Outcome.bind_next, Outcome.bind_returned, Outcome.bind_ite, Outcome.outputs_ite, Outcome.outputs_next, Outcome.outputs_returned]
+    all_goals
+      simp_all (config := {failIfUnchanged := false}) [graph_eval10, RMVerify.environment, RMVerify.update, RMVerify.Expr.eval, RMVerify.Op.eval, RMVerify.Stmt.exec, List.range_succ]
+      all_goals (repeat&#x27; (first | omega | split &lt;;&gt; simp_all (config := {failIfUnchanged := false}) [RMVerify.environment, RMVerify.update, RMVerify.Expr.eval, RMVerify.Op.eval, RMVerify.Stmt.exec, List.range_succ]))
+      all_goals first | omega | grind [RMVerify.flag]
+#print axioms translation10
+def graphn0 : Graph := ⟨0, [(.lit (0)), (.lit (0)), (.ite (.var 0) (.var 1) (.var 1)), (.lit (0)), (.lit (1)), (.ite (.var 0) (.var 3) (.var 4)), (.var 2), (.var 5)], [6, 7]⟩
+theorem graph_evaln0 (env : Env) : graphn0.run env = [((.ite (.lit (0)) (.lit (0)) (.lit (0))) : Expr).eval env, ((.ite (.lit (0)) (.lit (0)) (.lit (1))) : Expr).eval env] := by rfl
+def graphn1 : Graph := ⟨0, [(.lit (1)), (.lit (0)), (.ite (.var 0) (.var 1) (.var 1)), (.lit (0)), (.lit (1)), (.ite (.var 0) (.var 3) (.var 4)), (.var 2), (.var 5)], [6, 7]⟩
+theorem graph_evaln1 (env : Env) : graphn1.run env = [((.ite (.lit (1)) (.lit (0)) (.lit (0))) : Expr).eval env, ((.ite (.lit (1)) (.lit (0)) (.lit (1))) : Expr).eval env] := by rfl
+def graphn2 : Graph := ⟨4, [(.lit (0)), (.lit (0)), (.bin .eq (.var 0) (.var 5)), (.lit (1)), (.bin .eq (.var 0) (.var 7)), (.bin .eq (.var 1) (.var 5)), (.ite (.var 3) (.lit (0)) (.lit (1))), (.ite (.var 2) (.var 10) (.var 3)), (.bin .or (.var 9) (.var 11)), (.lit (2)), (.ite (.var 12) (.var 13) (.var 0)), (.bin .eq (.var 0) (.var 13)), (.ite (.var 15) (.var 5) (.var 0)), (.ite (.var 8) (.var 14) (.var 16)), (.ite (.var 6) (.var 7) (.var 17)), (.ite (.var 4) (.var 0) (.var 18)), (.ite (.var 6) (.var 3) (.var 2)), (.ite (.var 4) (.var 2) (.var 20)), (.var 19), (.var 21)], [22, 23]⟩
+theorem graph_evaln2 (env : Env) : graphn2.run env = [((.ite (.lit (0)) (.var 0) (.ite (.bin .eq (.var 0) (.lit (0))) (.lit (1)) (.ite (.bin .eq (.var 0) (.lit (1))) (.ite (.bin .or (.bin .eq (.var 1) (.lit (0))) (.ite (.var 2) (.ite (.var 3) (.lit (0)) (.lit (1))) (.var 3))) (.lit (2)) (.var 0)) (.ite (.bin .eq (.var 0) (.lit (2))) (.lit (0)) (.var 0))))) : Expr).eval env, ((.ite (.lit (0)) (.var 2) (.ite (.bin .eq (.var 0) (.lit (0))) (.var 3) (.var 2))) : Expr).eval env] := by rfl
+def graphn3 : Graph := ⟨4, [(.lit (1)), (.lit (0)), (.bin .eq (.var 0) (.var 5)), (.lit (1)), (.bin .eq (.var 0) (.var 7)), (.bin .eq (.var 1) (.var 5)), (.ite (.var 3) (.lit (0)) (.lit (1))), (.ite (.var 2) (.var 10) (.var 3)), (.bin .or (.var 9) (.var 11)), (.lit (2)), (.ite (.var 12) (.var 13) (.var 0)), (.bin .eq (.var 0) (.var 13)), (.ite (.var 15) (.var 5) (.var 0)), (.ite (.var 8) (.var 14) (.var 16)), (.ite (.var 6) (.var 7) (.var 17)), (.ite (.var 4) (.var 0) (.var 18)), (.ite (.var 6) (.var 3) (.var 2)), (.ite (.var 4) (.var 2) (.var 20)), (.var 19), (.var 21)], [22, 23]⟩
+theorem graph_evaln3 (env : Env) : graphn3.run env = [((.ite (.lit (1)) (.var 0) (.ite (.bin .eq (.var 0) (.lit (0))) (.lit (1)) (.ite (.bin .eq (.var 0) (.lit (1))) (.ite (.bin .or (.bin .eq (.var 1) (.lit (0))) (.ite (.var 2) (.ite (.var 3) (.lit (0)) (.lit (1))) (.var 3))) (.lit (2)) (.var 0)) (.ite (.bin .eq (.var 0) (.lit (2))) (.lit (0)) (.var 0))))) : Expr).eval env, ((.ite (.lit (1)) (.var 2) (.ite (.bin .eq (.var 0) (.lit (0))) (.var 3) (.var 2))) : Expr).eval env] := by rfl
+def graphn4 : Graph := ⟨0, [(.lit (0)), (.lit (0)), (.ite (.var 0) (.var 1) (.var 1)), (.lit (0)), (.lit (1)), (.ite (.var 0) (.var 3) (.var 4)), (.var 2), (.var 5)], [6, 7]⟩
+theorem graph_evaln4 (env : Env) : graphn4.run env = [((.ite (.lit (0)) (.lit (0)) (.lit (0))) : Expr).eval env, ((.ite (.lit (0)) (.lit (0)) (.lit (1))) : Expr).eval env] := by rfl
+def graphn5 : Graph := ⟨0, [(.lit (1)), (.lit (0)), (.ite (.var 0) (.var 1) (.var 1)), (.lit (0)), (.lit (1)), (.ite (.var 0) (.var 3) (.var 4)), (.var 2), (.var 5)], [6, 7]⟩
+theorem graph_evaln5 (env : Env) : graphn5.run env = [((.ite (.lit (1)) (.lit (0)) (.lit (0))) : Expr).eval env, ((.ite (.lit (1)) (.lit (0)) (.lit (1))) : Expr).eval env] := by rfl
+def graphn6 : Graph := ⟨4, [(.lit (0)), (.lit (0)), (.bin .eq (.var 1) (.var 5)), (.lit (1)), (.bin .eq (.var 1) (.var 7)), (.bin .eq (.var 0) (.var 5)), (.ite (.var 2) (.lit (0)) (.lit (1))), (.ite (.var 3) (.var 2) (.var 10)), (.bin .or (.var 9) (.var 11)), (.lit (2)), (.ite (.var 12) (.var 13) (.var 1)), (.bin .eq (.var 1) (.var 13)), (.ite (.var 15) (.var 5) (.var 1)), (.ite (.var 8) (.var 14) (.var 16)), (.ite (.var 6) (.var 7) (.var 17)), (.ite (.var 4) (.var 1) (.var 18)), (.lit (0)), (.ite (.var 20) (.lit (0)) (.lit (1))), (.ite (.var 2) (.var 20) (.var 21)), (.ite (.var 6) (.var 22) (.var 3)), (.ite (.var 4) (.var 3) (.var 23)), (.var 19), (.var 24)], [25, 26]⟩
+theorem graph_evaln6 (env : Env) : graphn6.run env = [((.ite (.lit (0)) (.var 1) (.ite (.bin .eq (.var 1) (.lit (0))) (.lit (1)) (.ite (.bin .eq (.var 1) (.lit (1))) (.ite (.bin .or (.bin .eq (.var 0) (.lit (0))) (.ite (.var 3) (.var 2) (.ite (.var 2) (.lit (0)) (.lit (1))))) (.lit (2)) (.var 1)) (.ite (.bin .eq (.var 1) (.lit (2))) (.lit (0)) (.var 1))))) : Expr).eval env, ((.ite (.lit (0)) (.var 3) (.ite (.bin .eq (.var 1) (.lit (0))) (.ite (.var 2) (.lit (0)) (.ite (.lit (0)) (.lit (0)) (.lit (1)))) (.var 3))) : Expr).eval env] := by rfl
+def graphn7 : Graph := ⟨4, [(.lit (1)), (.lit (0)), (.bin .eq (.var 1) (.var 5)), (.lit (1)), (.bin .eq (.var 1) (.var 7)), (.bin .eq (.var 0) (.var 5)), (.ite (.var 2) (.lit (0)) (.lit (1))), (.ite (.var 3) (.var 2) (.var 10)), (.bin .or (.var 9) (.var 11)), (.lit (2)), (.ite (.var 12) (.var 13) (.var 1)), (.bin .eq (.var 1) (.var 13)), (.ite (.var 15) (.var 5) (.var 1)), (.ite (.var 8) (.var 14) (.var 16)), (.ite (.var 6) (.var 7) (.var 17)), (.ite (.var 4) (.var 1) (.var 18)), (.lit (0)), (.ite (.var 20) (.lit (0)) (.lit (1))), (.ite (.var 2) (.var 20) (.var 21)), (.ite (.var 6) (.var 22) (.var 3)), (.ite (.var 4) (.var 3) (.var 23)), (.var 19), (.var 24)], [25, 26]⟩
+theorem graph_evaln7 (env : Env) : graphn7.run env = [((.ite (.lit (1)) (.var 1) (.ite (.bin .eq (.var 1) (.lit (0))) (.lit (1)) (.ite (.bin .eq (.var 1) (.lit (1))) (.ite (.bin .or (.bin .eq (.var 0) (.lit (0))) (.ite (.var 3) (.var 2) (.ite (.var 2) (.lit (0)) (.lit (1))))) (.lit (2)) (.var 1)) (.ite (.bin .eq (.var 1) (.lit (2))) (.lit (0)) (.var 1))))) : Expr).eval env, ((.ite (.lit (1)) (.var 3) (.ite (.bin .eq (.var 1) (.lit (0))) (.ite (.var 2) (.lit (0)) (.ite (.lit (0)) (.lit (0)) (.lit (1)))) (.var 3))) : Expr).eval env] := by rfl
+open RMVerify.Reactive
+structure State where
+  f0 : Int
+  f1 : Int
+  f2 : Bool
+  f3 : Bool
+  deriving Repr, DecidableEq
+def encodeState (s : State) : List Int := [s.f0, s.f1, flag s.f2, flag s.f3]
+def atom0 : Atom State where
+  controls := [0, 2]
+  reads := [0, 1, 2, 3]
+  awaits := []
+  initial s := ([s.f0, flag s.f2] = graphn0.run (environment [])) ∨ ([s.f0, flag s.f2] = graphn1.run (environment []))
+  step s t := ([t.f0, flag t.f2] = graphn2.run (environment [s.f0, s.f1, flag s.f2, flag s.f3])) ∨ ([t.f0, flag t.f2] = graphn3.run (environment [s.f0, s.f1, flag s.f2, flag s.f3]))
+def sourceAtom0 : Atom State where
+  controls := [0, 2]
+  reads := [0, 1, 2, 3]
+  awaits := []
+  initial s := ([s.f0, flag s.f2] = ((source0.exec (environment [])).outputs 2).take 2) ∨ ([s.f0, flag s.f2] = ((source1.exec (environment [])).outputs 2).take 2)
+  step s t := ([t.f0, flag t.f2] = [s.f0, flag s.f2]) ∨ ([t.f0, flag t.f2] = ((source2.exec (environment [s.f0, flag s.f2, s.f1, flag s.f3])).outputs 2).take 2)
+theorem atom_agreement0 : sourceAtom0 = atom0 := by
+  have agree0  : (source0.exec (environment [])).outputs 2 = graph0.run (environment []) := by
+    exact translation0 _ (by simp [environment])
+  have agree1  : (source1.exec (environment [])).outputs 2 = graph1.run (environment []) := by
+    exact translation1 _ (by simp [environment])
+  have agree2 (s : State) : (source2.exec (environment [s.f0, flag s.f2, s.f1, flag s.f3])).outputs 2 = graph2.run (environment [s.f0, flag s.f2, s.f1, flag s.f3]) := by
+    exact translation2 _ (by simp [environment])
+  unfold sourceAtom0 atom0
+  rw [Atom.mk.injEq]
+  refine ⟨rfl, rfl, rfl, ?_, ?_⟩
+  · funext s; apply propext
+    simp only [agree0, agree1, agree2]
+    all_goals
+      simp_all (config := {failIfUnchanged := false}) [source0, graph_eval0, source1, graph_eval1, source2, graph_eval2, source3, graph_eval3, source4, graph_eval4, source5, graph_eval5, source6, graph_eval6, source7, graph_eval7, source8, graph_eval8, source9, graph_eval9, source10, graph_eval10, graph_evaln0, graph_evaln1, graph_evaln2, graph_evaln3, graph_evaln4, graph_evaln5, graph_evaln6, graph_evaln7, encodeState, RMVerify.environment, RMVerify.update, RMVerify.Expr.eval, RMVerify.Op.eval, RMVerify.Stmt.exec, List.range_succ]
+      all_goals (repeat&#x27; (first | omega | split &lt;;&gt; simp_all (config := {failIfUnchanged := false}) [RMVerify.environment, RMVerify.update, RMVerify.Expr.eval, RMVerify.Op.eval, RMVerify.Stmt.exec, List.range_succ]))
+      all_goals first | omega | grind [RMVerify.flag]
+  · funext s t; apply propext
+    simp only [agree0, agree1, agree2]
+    all_goals
+      simp_all (config := {failIfUnchanged := false}) [source0, graph_eval0, source1, graph_eval1, source2, graph_eval2, source3, graph_eval3, source4, graph_eval4, source5, graph_eval5, source6, graph_eval6, source7, graph_eval7, source8, graph_eval8, source9, graph_eval9, source10, graph_eval10, graph_evaln0, graph_evaln1, graph_evaln2, graph_evaln3, graph_evaln4, graph_evaln5, graph_evaln6, graph_evaln7, encodeState, RMVerify.environment, RMVerify.update, RMVerify.Expr.eval, RMVerify.Op.eval, RMVerify.Stmt.exec, List.range_succ]
+      all_goals (repeat&#x27; (first | omega | split &lt;;&gt; simp_all (config := {failIfUnchanged := false}) [RMVerify.environment, RMVerify.update, RMVerify.Expr.eval, RMVerify.Op.eval, RMVerify.Stmt.exec, List.range_succ]))
+      all_goals first | omega | grind [RMVerify.flag]
+#print axioms atom_agreement0
+def atom1 : Atom State where
+  controls := [1, 3]
+  reads := [0, 1, 2, 3]
+  awaits := []
+  initial s := ([s.f1, flag s.f3] = graphn4.run (environment [])) ∨ ([s.f1, flag s.f3] = graphn5.run (environment []))
+  step s t := ([t.f1, flag t.f3] = graphn6.run (environment [s.f0, s.f1, flag s.f2, flag s.f3])) ∨ ([t.f1, flag t.f3] = graphn7.run (environment [s.f0, s.f1, flag s.f2, flag s.f3]))
+def sourceAtom1 : Atom State where
+  controls := [1, 3]
+  reads := [0, 1, 2, 3]
+  awaits := []
+  initial s := ([s.f1, flag s.f3] = ((source3.exec (environment [])).outputs 2).take 2) ∨ ([s.f1, flag s.f3] = ((source4.exec (environment [])).outputs 2).take 2)
+  step s t := ([t.f1, flag t.f3] = [s.f1, flag s.f3]) ∨ ([t.f1, flag t.f3] = ((source5.exec (environment [s.f1, flag s.f3, s.f0, flag s.f2])).outputs 2).take 2)
+theorem atom_agreement1 : sourceAtom1 = atom1 := by
+  have agree3  : (source3.exec (environment [])).outputs 2 = graph3.run (environment []) := by
+    exact translation3 _ (by simp [environment])
+  have agree4  : (source4.exec (environment [])).outputs 2 = graph4.run (environment []) := by
+    exact translation4 _ (by simp [environment])
+  have agree5 (s : State) : (source5.exec (environment [s.f1, flag s.f3, s.f0, flag s.f2])).outputs 2 = graph5.run (environment [s.f1, flag s.f3, s.f0, flag s.f2]) := by
+    exact translation5 _ (by simp [environment])
+  unfold sourceAtom1 atom1
+  rw [Atom.mk.injEq]
+  refine ⟨rfl, rfl, rfl, ?_, ?_⟩
+  · funext s; apply propext
+    simp only [agree3, agree4, agree5]
+    all_goals
+      simp_all (config := {failIfUnchanged := false}) [source0, graph_eval0, source1, graph_eval1, source2, graph_eval2, source3, graph_eval3, source4, graph_eval4, source5, graph_eval5, source6, graph_eval6, source7, graph_eval7, source8, graph_eval8, source9, graph_eval9, source10, graph_eval10, graph_evaln0, graph_evaln1, graph_evaln2, graph_evaln3, graph_evaln4, graph_evaln5, graph_evaln6, graph_evaln7, encodeState, atom0, RMVerify.environment, RMVerify.update, RMVerify.Expr.eval, RMVerify.Op.eval, RMVerify.Stmt.exec, List.range_succ]
+      all_goals (repeat&#x27; (first | omega | split &lt;;&gt; simp_all (config := {failIfUnchanged := false}) [RMVerify.environment, RMVerify.update, RMVerify.Expr.eval, RMVerify.Op.eval, RMVerify.Stmt.exec, List.range_succ]))
+      all_goals first | omega | grind [RMVerify.flag]
+  · funext s t; apply propext
+    simp only [agree3, agree4, agree5]
+    all_goals
+      simp_all (config := {failIfUnchanged := false}) [source0, graph_eval0, source1, graph_eval1, source2, graph_eval2, source3, graph_eval3, source4, graph_eval4, source5, graph_eval5, source6, graph_eval6, source7, graph_eval7, source8, graph_eval8, source9, graph_eval9, source10, graph_eval10, graph_evaln0, graph_evaln1, graph_evaln2, graph_evaln3, graph_evaln4, graph_evaln5, graph_evaln6, graph_evaln7, encodeState, atom0, RMVerify.environment, RMVerify.update, RMVerify.Expr.eval, RMVerify.Op.eval, RMVerify.Stmt.exec, List.range_succ]
+      all_goals (repeat&#x27; (first | omega | split &lt;;&gt; simp_all (config := {failIfUnchanged := false}) [RMVerify.environment, RMVerify.update, RMVerify.Expr.eval, RMVerify.Op.eval, RMVerify.Stmt.exec, List.range_succ]))
+      all_goals first | omega | grind [RMVerify.flag]
+#print axioms atom_agreement1
+def part0 : Reactive.Module State := ⟨[atom0]⟩
+def part1 : Reactive.Module State := ⟨[atom1]⟩
+def composed : Reactive.Module State := (part0.parallel part1)
+def sourcePart0 : Reactive.Module State := ⟨[sourceAtom0]⟩
+def sourcePart1 : Reactive.Module State := ⟨[sourceAtom1]⟩
+def sourceModule : Reactive.Module State := (sourcePart0.parallel sourcePart1)
+theorem source_module_eq : sourceModule = composed := by
+  simp only [sourceModule, composed, part0, part1, sourcePart0, sourcePart1, atom_agreement0, atom_agreement1]
+theorem composition_correspondence (s t : State) : sourceModule.step s t ↔ composed.step s t := by rw [source_module_eq]
+theorem well_formed : composed.wellFormed 4 = true := by decide
+#print axioms source_module_eq
+#print axioms composition_correspondence
+#print axioms well_formed
+def inv0 (s : State) : Prop := environment (graph6.run (environment (encodeState s))) 0 ≠ 0
+def sourceInv0 (s : State) : Prop := environment ((source6.exec (environment (encodeState s))).outputs 0) 0 ≠ 0
+theorem inv_agreement0 (s : State) : sourceInv0 s ↔ inv0 s := by
+  unfold sourceInv0 inv0; rw [translation6 _ (by simp [environment, encodeState])]
+#print axioms inv_agreement0
+def inv1 (s : State) : Prop := environment (graph7.run (environment (encodeState s))) 0 ≠ 0
+def sourceInv1 (s : State) : Prop := environment ((source7.exec (environment (encodeState s))).outputs 0) 0 ≠ 0
+theorem inv_agreement1 (s : State) : sourceInv1 s ↔ inv1 s := by
+  unfold sourceInv1 inv1; rw [translation7 _ (by simp [environment, encodeState])]
+#print axioms inv_agreement1
+def inv2 (s : State) : Prop := environment (graph8.run (environment (encodeState s))) 0 ≠ 0
+def sourceInv2 (s : State) : Prop := environment ((source8.exec (environment (encodeState s))).outputs 0) 0 ≠ 0
+theorem inv_agreement2 (s : State) : sourceInv2 s ↔ inv2 s := by
+  unfold sourceInv2 inv2; rw [translation8 _ (by simp [environment, encodeState])]
+#print axioms inv_agreement2
+def safe (s : State) : Prop := inv0 s ∧ inv1 s ∧ inv2 s ∧ True
+def sourceSafe (s : State) : Prop := sourceInv0 s ∧ sourceInv1 s ∧ sourceInv2 s ∧ True
+def specified_initial (s : State) : Prop := environment (graph9.run (environment (encodeState s))) 0 ≠ 0
+def source_specified_initial (s : State) : Prop := environment ((source9.exec (environment (encodeState s))).outputs 0) 0 ≠ 0
+theorem specified_initial_agreement (s : State) : source_specified_initial s  ↔ specified_initial s  := by
+  unfold source_specified_initial specified_initial; rw [translation9 _ (by simp [environment, encodeState])]
+#print axioms specified_initial_agreement
+def specified_step (s t : State) : Prop := environment (graph10.run (environment (encodeState s ++ encodeState t))) 0 ≠ 0
+def source_specified_step (s t : State) : Prop := environment ((source10.exec (environment (encodeState s ++ encodeState t))).outputs 0) 0 ≠ 0
+theorem specified_step_agreement (s t : State) : source_specified_step s t ↔ specified_step s t := by
+  unfold source_specified_step specified_step; rw [translation10 _ (by simp [environment, encodeState])]
+#print axioms specified_step_agreement
+def initialOutput0 : List Int := graphn0.run (environment [])
+def nextOutput0 (s : State) : List Int := graphn2.run (environment [s.f0, s.f1, flag s.f2, flag s.f3])
+def initialOutput1 : List Int := graphn4.run (environment [])
+def nextOutput1 (s : State) : List Int := graphn6.run (environment [s.f0, s.f1, flag s.f2, flag s.f3])
+def initialWitness : State := ⟨environment initialOutput0 0, environment initialOutput1 0, (environment initialOutput0 1 != 0), (environment initialOutput1 1 != 0)⟩
+def nextWitness (s : State) : State := ⟨environment (nextOutput0 s) 0, environment (nextOutput1 s) 0, (environment (nextOutput0 s) 1 != 0), (environment (nextOutput1 s) 1 != 0)⟩
+theorem initial_nonempty : ∃ s, composed.initial s := by
+  refine ⟨initialWitness, ?_⟩
+  simp_all (config := {failIfUnchanged := false}) [source0, graph_eval0, source1, graph_eval1, source2, graph_eval2, source3, graph_eval3, source4, graph_eval4, source5, graph_eval5, source6, graph_eval6, source7, graph_eval7, source8, graph_eval8, source9, graph_eval9, source10, graph_eval10, graph_evaln0, graph_evaln1, graph_evaln2, graph_evaln3, graph_evaln4, graph_evaln5, graph_evaln6, graph_evaln7, encodeState, atom0, atom1, part0, part1, composed, Reactive.Module.parallel, Reactive.Module.initial, Reactive.Module.step, inv0, inv1, inv2, safe, specified_initial, specified_step, initialOutput0, nextOutput0, initialOutput1, nextOutput1, initialWitness, RMVerify.environment, RMVerify.update, RMVerify.Expr.eval, RMVerify.Op.eval, RMVerify.Stmt.exec, List.range_succ]
+  all_goals (repeat&#x27; (first | omega | split &lt;;&gt; simp_all (config := {failIfUnchanged := false}) [RMVerify.environment, RMVerify.update, RMVerify.Expr.eval, RMVerify.Op.eval, RMVerify.Stmt.exec, List.range_succ]))
+  all_goals first | omega | grind [RMVerify.flag]
+theorem nonblocking (s : State) : ∃ t, composed.step s t := by
+  refine ⟨nextWitness s, ?_⟩
+  simp_all (config := {failIfUnchanged := false}) [source0, graph_eval0, source1, graph_eval1, source2, graph_eval2, source3, graph_eval3, source4, graph_eval4, source5, graph_eval5, source6, graph_eval6, source7, graph_eval7, source8, graph_eval8, source9, graph_eval9, source10, graph_eval10, graph_evaln0, graph_evaln1, graph_evaln2, graph_evaln3, graph_evaln4, graph_evaln5, graph_evaln6, graph_evaln7, encodeState, atom0, atom1, part0, part1, composed, Reactive.Module.parallel, Reactive.Module.initial, Reactive.Module.step, inv0, inv1, inv2, safe, specified_initial, specified_step, initialOutput0, nextOutput0, initialOutput1, nextOutput1, nextWitness, RMVerify.environment, RMVerify.update, RMVerify.Expr.eval, RMVerify.Op.eval, RMVerify.Stmt.exec, List.range_succ]
+  all_goals (repeat&#x27; (first | omega | split &lt;;&gt; simp_all (config := {failIfUnchanged := false}) [RMVerify.environment, RMVerify.update, RMVerify.Expr.eval, RMVerify.Op.eval, RMVerify.Stmt.exec, List.range_succ]))
+  all_goals first | omega | grind [RMVerify.flag]
+#print axioms initial_nonempty
+#print axioms nonblocking
+end Verified
+</code></pre></details><details><summary>InitialRelation.log</summary><pre><code>&#x27;relation&#x27; depends on axioms: [propext, Classical.choice, Quot.sound]
+&#x27;source_relation&#x27; depends on axioms: [propext, Classical.choice, Quot.sound]
+</code></pre></details><details><summary>Invariants.log</summary><pre><code>&#x27;invariant&#x27; depends on axioms: [propext, Classical.choice, Quot.sound]
+&#x27;always_safe&#x27; depends on axioms: [propext, Classical.choice, Quot.sound]
+&#x27;source_invariant&#x27; depends on axioms: [propext, Classical.choice, Quot.sound]
+</code></pre></details><details><summary>StepRelation.log</summary><pre><code>&#x27;relation&#x27; depends on axioms: [propext, Classical.choice, Quot.sound]
+&#x27;source_relation&#x27; depends on axioms: [propext, Classical.choice, Quot.sound]
+</code></pre></details><details><summary>Translation.log</summary><pre><code>&#x27;Verified.translation0&#x27; depends on axioms: [propext]
+&#x27;Verified.translation1&#x27; depends on axioms: [propext]
+&#x27;Verified.translation2&#x27; depends on axioms: [propext, Quot.sound]
+&#x27;Verified.translation3&#x27; depends on axioms: [propext]
+&#x27;Verified.translation4&#x27; depends on axioms: [propext]
+&#x27;Verified.translation5&#x27; depends on axioms: [propext, Classical.choice, Quot.sound]
+&#x27;Verified.translation6&#x27; depends on axioms: [propext, Classical.choice, Quot.sound]
+&#x27;Verified.translation7&#x27; depends on axioms: [propext]
+&#x27;Verified.translation8&#x27; depends on axioms: [propext, Classical.choice, Quot.sound]
+&#x27;Verified.translation9&#x27; depends on axioms: [propext]
+&#x27;Verified.translation10&#x27; depends on axioms: [propext, Classical.choice, Quot.sound]
+&#x27;Verified.atom_agreement0&#x27; depends on axioms: [propext, Classical.choice, Quot.sound]
+&#x27;Verified.atom_agreement1&#x27; depends on axioms: [propext, Classical.choice, Quot.sound]
+&#x27;Verified.source_module_eq&#x27; depends on axioms: [propext, Classical.choice, Quot.sound]
+&#x27;Verified.composition_correspondence&#x27; depends on axioms: [propext, Classical.choice, Quot.sound]
+&#x27;Verified.well_formed&#x27; depends on axioms: [propext]
+&#x27;Verified.inv_agreement0&#x27; depends on axioms: [propext, Classical.choice, Quot.sound]
+&#x27;Verified.inv_agreement1&#x27; depends on axioms: [propext]
+&#x27;Verified.inv_agreement2&#x27; depends on axioms: [propext, Classical.choice, Quot.sound]
+&#x27;Verified.specified_initial_agreement&#x27; depends on axioms: [propext]
+&#x27;Verified.specified_step_agreement&#x27; depends on axioms: [propext, Classical.choice, Quot.sound]
+&#x27;Verified.initial_nonempty&#x27; depends on axioms: [propext, Quot.sound]
+&#x27;Verified.nonblocking&#x27; depends on axioms: [propext, Quot.sound]
+</code></pre></details><details><summary>build.log</summary><pre><code>info: rmverifyEvidence: no previous manifest, creating one from scratch
+info: toolchain not updated; already up-to-date
+✔ [2/3] Built Semantics (1.4s)
+Build completed successfully (3 jobs).
+</code></pre></details><details><summary>module.rm</summary><pre><code>module
+  interface
+    pc1 : Int([1,1])
+    pc2 : Int([1,1])
+    x1 : Bool([1,1])
+    x2 : Bool([1,1])
+  atom controls pc1, x1 reads pc1, pc2, x1, x2
+  init
+    #310 := AnyBool 
+    #311 := [[0]] 
+    #312 := Ite (#310, #311, #311)
+    #313 := [[false]] 
+    #314 := [[true]] 
+    #315 := Ite (#310, #313, #314)
+    X(pc1) := Id #312
+    X(x1) := Id #315
+  delay
+    d(pc1) := ZERO 
+    d(x1) := ZERO 
+  update
+    #316 := AnyBool 
+    #317 := [[0]] 
+    #318 := Eq (pc1, #317)
+    #319 := [[1]] 
+    #320 := Eq (pc1, #319)
+    #321 := Eq (pc2, #317)
+    #322 := Not x2
+    #323 := Ite (x1, #322, x2)
+    #324 := Or (#321, #323)
+    #325 := [[2]] 
+    #326 := Ite (#324, #325, pc1)
+    #327 := Eq (pc1, #325)
+    #328 := Ite (#327, #317, pc1)
+    #329 := Ite (#320, #326, #328)
+    #330 := Ite (#318, #319, #329)
+    #331 := Ite (#316, pc1, #330)
+    #332 := Ite (#318, x2, x1)
+    #333 := Ite (#316, x1, #332)
+    X(pc1) := Id #331
+    X(x1) := Id #333
+  atom controls pc2, x2 reads pc1, pc2, x1, x2
+  init
+    #334 := AnyBool 
+    #335 := [[0]] 
+    #336 := Ite (#334, #335, #335)
+    #337 := [[false]] 
+    #338 := [[true]] 
+    #339 := Ite (#334, #337, #338)
+    X(pc2) := Id #336
+    X(x2) := Id #339
+  delay
+    d(pc2) := ZERO 
+    d(x2) := ZERO 
+  update
+    #340 := AnyBool 
+    #341 := [[0]] 
+    #342 := Eq (pc2, #341)
+    #343 := [[1]] 
+    #344 := Eq (pc2, #343)
+    #345 := Eq (pc1, #341)
+    #346 := Not x1
+    #347 := Ite (x2, x1, #346)
+    #348 := Or (#345, #347)
+    #349 := [[2]] 
+    #350 := Ite (#348, #349, pc2)
+    #351 := Eq (pc2, #349)
+    #352 := Ite (#351, #341, pc2)
+    #353 := Ite (#344, #350, #352)
+    #354 := Ite (#342, #343, #353)
+    #355 := Ite (#340, pc2, #354)
+    #356 := [[false]] 
+    #357 := Not #356
+    #358 := Ite (x1, #356, #357)
+    #359 := Ite (#342, #358, x2)
+    #360 := Ite (#340, x2, #359)
+    X(pc2) := Id #355
+    X(x2) := Id #360
+
+</code></pre></details><details><summary>artifact.json</summary><pre><code>{
+  &quot;sources&quot;: {
+    &quot;/home/angeloh/Desktop/work/paxos/formal/examples/peterson_v2.py&quot;: &quot;60f85ba24172c344621c8ed89692d2781e53594e4716c34be959a3d8a260682f&quot;
+  },
+  &quot;tooling&quot;: {
+    &quot;frontend.py&quot;: &quot;587d1c1d34c12a357ebe92a93ef47ee4dd1a64dea64203a73eadf8e6793b90c3&quot;,
+    &quot;api.py&quot;: &quot;a9cb1900387f368d6f3e86cb3f929519f4806e35962868c219865de7ed5df63d&quot;,
+    &quot;lean_backend.py&quot;: &quot;ba2e9de2dd2f7820a58a7b75dd5a8224cebaae5d7b23ab103c90203666a5f19d&quot;,
+    &quot;compiler.py&quot;: &quot;d5f68bf03119294762b54be52f3ef075db352d5292ee0c2dd1ddb0eec37addb2&quot;,
+    &quot;solver.py&quot;: &quot;e0dc8906199192b2013173a0dd7da30462476a574f23d875a6e0df237f847e20&quot;,
+    &quot;checking.py&quot;: &quot;6e1290d39048b178a7b1d12c1077fb586ea55ff94e50df24be9082393d2382f3&quot;,
+    &quot;__init__.py&quot;: &quot;07d49f07944befa62182fc02b119ff4977b9cdbd559a8d5200080fc06fc7e488&quot;,
+    &quot;__main__.py&quot;: &quot;a370c48e4f71e3cae2b00076377260747efda8395804a2bd921d913887a59afb&quot;,
+    &quot;composition.py&quot;: &quot;05be60b8c8e8addfb3047bae7f072bdde083dc2d061a04510e94de8575c62480&quot;,
+    &quot;lean/lean-toolchain&quot;: &quot;54727eec5cba149c18842e6deb5c41b369d66455c93ce135d7d5347c782b2325&quot;,
+    &quot;lean/Semantics.lean&quot;: &quot;3acfc454eed5616e27497a1d337e3d6c8d0f5a5be8bcd89a4001faa61926144e&quot;,
+    &quot;zrth/sugar.py&quot;: &quot;d06e038544ffbf30b93c12c92114eed97fc073036ec30ea840e721696e658ee8&quot;,
+    &quot;zrth/eval.py&quot;: &quot;681d4bf3c9e353cbcf43166d385c6333c524db8c6169f40efdbbd033bf87d301&quot;,
+    &quot;zrth/expr.py&quot;: &quot;74d36c2eb10ea24d097174adf8ff377399e39f44165b044fff998d44f98b086d&quot;,
+    &quot;zrth/analyzer.py&quot;: &quot;cdcc51281cbfa3c0d73f813661c11edec0f00431dca3d287d9d0ad4cee967a3d&quot;,
+    &quot;zrth/builder.py&quot;: &quot;def8bc84596efd5f1dc7e92d2e180d8612e3da4e847c3e9dcdc4b0b65c3ce2ba&quot;,
+    &quot;zrth/zrth.cpython-313-x86_64-linux-gnu.so&quot;: &quot;15168f2027cfcdfd573b533127466879cf2cab65c07008ef9dc3a613205c6093&quot;,
+    &quot;zrth/__init__.py&quot;: &quot;589ed3a74d8dbfeae147d28b2e9d53e4612dd734132804e8ee81494fbabfd9f4&quot;,
+    &quot;zrth/sort.py&quot;: &quot;53fee9e81b1e8f61c4481c76107ea900d25d36bed62ae3dbf515cf5397793ed4&quot;,
+    &quot;zrth/visual/server.py&quot;: &quot;2c785b8047e9a20301edd9ff035794c82bddebbdde5cd50479ef760dccebac83&quot;,
+    &quot;zrth/visual/__init__.py&quot;: &quot;ae6f2c3816253f7a7f85f7a0d27e6174e36781d89fc6ec7e3ef6e8093dbd5167&quot;,
+    &quot;zrth/smt/z3.py&quot;: &quot;ae886868d89d0cabef5d7913fccdd49eb438c4f846718bd3f8f757b95afcbeef&quot;,
+    &quot;zrth/examples/__init__.py&quot;: &quot;e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855&quot;,
+    &quot;zrth/torch/module.py&quot;: &quot;7aa37a63fd1f7bdc068bcc108de23c71434533c3c6c7089050a943e82dc20339&quot;,
+    &quot;zrth/torch/__init__.py&quot;: &quot;75039d15e59f88b56ec261110b63063f89f32c2b7d7fa92b647738c39db7c373&quot;,
+    &quot;zrth/gym/module.py&quot;: &quot;6ad8256325981dc60487b8adb843707c8c2970105360d27241922fa5183b0eab&quot;,
+    &quot;zrth/gym/__init__.py&quot;: &quot;cf356aed57a136940d38477e8de1a6023b71d18df56d14970a8b77ad53539a9b&quot;,
+    &quot;zrth/smv/parser.py&quot;: &quot;176a95ad86fa91ff240851d85f828543cc22bf1b4d36db60305570882c0b73ba&quot;,
+    &quot;zrth/smv/__init__.py&quot;: &quot;89415709755c7bc37c3e9740126dcacda9addcd41b328031708e220abded7ba6&quot;
+  },
+  &quot;upstream_commit&quot;: &quot;66bdb2d37d4c2fb925c103f8088b43653773d298&quot;,
+  &quot;specification&quot;: {
+    &quot;target&quot;: [
+      &quot;examples.peterson_v2&quot;,
+      &quot;State&quot;
+    ],
+    &quot;components&quot;: [
+      {
+        &quot;target&quot;: [
+          &quot;examples.peterson_v2&quot;,
+          &quot;P1&quot;
+        ],
+        &quot;initial&quot;: [
+          &quot;examples.peterson_v2&quot;,
+          &quot;P1.__init__&quot;,
+          &quot;ee728dc4261e687e065eba037da672ced200876ed222cdacf8d271c2ea278846&quot;
+        ],
+        &quot;transitions&quot;: [
+          [
+            &quot;examples.peterson_v2&quot;,
+            &quot;P1.advance&quot;,
+            &quot;4115d4b97cd4b8097ca77a9aed02bebaa71fcad3e448965bf4790f124093f38c&quot;
+          ]
+        ],
+        &quot;controls&quot;: {
+          &quot;pc&quot;: &quot;pc1&quot;,
+          &quot;x&quot;: &quot;x1&quot;
+        },
+        &quot;inputs&quot;: {
+          &quot;pc2&quot;: &quot;pc2&quot;,
+          &quot;x2&quot;: &quot;x2&quot;
+        },
+        &quot;initial_inputs&quot;: {},
+        &quot;stutter&quot;: true
+      },
+      {
+        &quot;target&quot;: [
+          &quot;examples.peterson_v2&quot;,
+          &quot;P2&quot;
+        ],
+        &quot;initial&quot;: [
+          &quot;examples.peterson_v2&quot;,
+          &quot;P2.__init__&quot;,
+          &quot;8a22663d230464ee667b67af0135a07e5d207273a3409345980c6b904567ce45&quot;
+        ],
+        &quot;transitions&quot;: [
+          [
+            &quot;examples.peterson_v2&quot;,
+            &quot;P2.advance&quot;,
+            &quot;3dd5c3b4ddabf6b3c8e898d23c5a9c3a40688c20d228e6779bd7473fad4098f4&quot;
+          ]
+        ],
+        &quot;controls&quot;: {
+          &quot;pc&quot;: &quot;pc2&quot;,
+          &quot;x&quot;: &quot;x2&quot;
+        },
+        &quot;inputs&quot;: {
+          &quot;pc1&quot;: &quot;pc1&quot;,
+          &quot;x1&quot;: &quot;x1&quot;
+        },
+        &quot;initial_inputs&quot;: {},
+        &quot;stutter&quot;: true
+      }
+    ],
+    &quot;invariants&quot;: [
+      [
+        &quot;examples.peterson_v2&quot;,
+        &quot;mutual_exclusion&quot;,
+        &quot;32e0794d041c6b7f12795369846f157f4c90681ff4501dc374174124ecb18409&quot;
+      ]
+    ],
+    &quot;strengthening&quot;: [
+      [
+        &quot;examples.peterson_v2&quot;,
+        &quot;control_locations&quot;,
+        &quot;cb53f73a144026fd932670d9c8ba28ccc4c229ec0a6e3c3dc29a6375f056a928&quot;
+      ],
+      [
+        &quot;examples.peterson_v2&quot;,
+        &quot;priority&quot;,
+        &quot;28f46bd158a72d621837bf64f764a6322840f190c9eb35c2e2b223305049f559&quot;
+      ]
+    ],
+    &quot;initial_relation&quot;: [
+      &quot;examples.peterson_v2&quot;,
+      &quot;paper_initial&quot;,
+      &quot;20442da0283b4f026b00bc9f9dd55a89a074bc208090a4b13175535d7032d5fe&quot;
+    ],
+    &quot;step_relation&quot;: [
+      &quot;examples.peterson_v2&quot;,
+      &quot;paper_round&quot;,
+      &quot;854c6910be0f7db4d46d1ea7a6495ae95cb65a4aee6033f3d755cf62963b4e5a&quot;
+    ]
+  },
+  &quot;version&quot;: 2,
+  &quot;fields&quot;: {
+    &quot;pc1&quot;: &quot;int&quot;,
+    &quot;pc2&quot;: &quot;int&quot;,
+    &quot;x1&quot;: &quot;bool&quot;,
+    &quot;x2&quot;: &quot;bool&quot;
+  },
+  &quot;atoms&quot;: [
+    {
+      &quot;name&quot;: &quot;0:P1&quot;,
+      &quot;component&quot;: 0,
+      &quot;controls&quot;: [
+        0,
+        2
+      ],
+      &quot;reads&quot;: [
+        0,
+        1,
+        2,
+        3
+      ],
+      &quot;awaits&quot;: [],
+      &quot;initial&quot;: [
+        {
+          &quot;index&quot;: 0,
+          &quot;arguments&quot;: {
+            &quot;x&quot;: false
+          }
+        },
+        {
+          &quot;index&quot;: 1,
+          &quot;arguments&quot;: {
+            &quot;x&quot;: true
+          }
+        }
+      ],
+      &quot;actions&quot;: [
+        {
+          &quot;index&quot;: 2,
+          &quot;ports&quot;: [
+            {
+              &quot;variable&quot;: 1,
+              &quot;awaited&quot;: false
+            },
+            {
+              &quot;variable&quot;: 3,
+              &quot;awaited&quot;: false
+            }
+          ]
+        }
+      ],
+      &quot;stutter&quot;: true,
+      &quot;native_text&quot;: &quot;atom controls pc1 : Int([1,1]), x1 : Bool([1,1]) reads pc1 : Int([1,1]), pc2 : Int([1,1]), x1 : Bool([1,1]), x2 : Bool([1,1])\ninit\n  #310 := AnyBool \n  #311 := [[0]] \n  #312 := Ite (#310, #311, #311)\n  #313 := [[false]] \n  #314 := [[true]] \n  #315 := Ite (#310, #313, #314)\n  X(pc1) := Id #312\n  X(x1) := Id #315\ndelay\n  d(pc1) := ZERO \n  d(x1) := ZERO \nupdate\n  #316 := AnyBool \n  #317 := [[0]] \n  #318 := Eq (pc1, #317)\n  #319 := [[1]] \n  #320 := Eq (pc1, #319)\n  #321 := Eq (pc2, #317)\n  #322 := Not x2\n  #323 := Ite (x1, #322, x2)\n  #324 := Or (#321, #323)\n  #325 := [[2]] \n  #326 := Ite (#324, #325, pc1)\n  #327 := Eq (pc1, #325)\n  #328 := Ite (#327, #317, pc1)\n  #329 := Ite (#320, #326, #328)\n  #330 := Ite (#318, #319, #329)\n  #331 := Ite (#316, pc1, #330)\n  #332 := Ite (#318, x2, x1)\n  #333 := Ite (#316, x1, #332)\n  X(pc1) := Id #331\n  X(x1) := Id #333\n&quot;,
+      &quot;native_inputs&quot;: [
+        {
+          &quot;variable&quot;: 0,
+          &quot;awaited&quot;: false
+        },
+        {
+          &quot;variable&quot;: 1,
+          &quot;awaited&quot;: false
+        },
+        {
+          &quot;variable&quot;: 2,
+          &quot;awaited&quot;: false
+        },
+        {
+          &quot;variable&quot;: 3,
+          &quot;awaited&quot;: false
+        }
+      ],
+      &quot;native_initial&quot;: [
+        0,
+        1
+      ],
+      &quot;native_update&quot;: [
+        2,
+        3
+      ]
+    },
+    {
+      &quot;name&quot;: &quot;1:P2&quot;,
+      &quot;component&quot;: 1,
+      &quot;controls&quot;: [
+        1,
+        3
+      ],
+      &quot;reads&quot;: [
+        0,
+        1,
+        2,
+        3
+      ],
+      &quot;awaits&quot;: [],
+      &quot;initial&quot;: [
+        {
+          &quot;index&quot;: 3,
+          &quot;arguments&quot;: {
+            &quot;x&quot;: false
+          }
+        },
+        {
+          &quot;index&quot;: 4,
+          &quot;arguments&quot;: {
+            &quot;x&quot;: true
+          }
+        }
+      ],
+      &quot;actions&quot;: [
+        {
+          &quot;index&quot;: 5,
+          &quot;ports&quot;: [
+            {
+              &quot;variable&quot;: 0,
+              &quot;awaited&quot;: false
+            },
+            {
+              &quot;variable&quot;: 2,
+              &quot;awaited&quot;: false
+            }
+          ]
+        }
+      ],
+      &quot;stutter&quot;: true,
+      &quot;native_text&quot;: &quot;atom controls pc2 : Int([1,1]), x2 : Bool([1,1]) reads pc1 : Int([1,1]), pc2 : Int([1,1]), x1 : Bool([1,1]), x2 : Bool([1,1])\ninit\n  #334 := AnyBool \n  #335 := [[0]] \n  #336 := Ite (#334, #335, #335)\n  #337 := [[false]] \n  #338 := [[true]] \n  #339 := Ite (#334, #337, #338)\n  X(pc2) := Id #336\n  X(x2) := Id #339\ndelay\n  d(pc2) := ZERO \n  d(x2) := ZERO \nupdate\n  #340 := AnyBool \n  #341 := [[0]] \n  #342 := Eq (pc2, #341)\n  #343 := [[1]] \n  #344 := Eq (pc2, #343)\n  #345 := Eq (pc1, #341)\n  #346 := Not x1\n  #347 := Ite (x2, x1, #346)\n  #348 := Or (#345, #347)\n  #349 := [[2]] \n  #350 := Ite (#348, #349, pc2)\n  #351 := Eq (pc2, #349)\n  #352 := Ite (#351, #341, pc2)\n  #353 := Ite (#344, #350, #352)\n  #354 := Ite (#342, #343, #353)\n  #355 := Ite (#340, pc2, #354)\n  #356 := [[false]] \n  #357 := Not #356\n  #358 := Ite (x1, #356, #357)\n  #359 := Ite (#342, #358, x2)\n  #360 := Ite (#340, x2, #359)\n  X(pc2) := Id #355\n  X(x2) := Id #360\n&quot;,
+      &quot;native_inputs&quot;: [
+        {
+          &quot;variable&quot;: 0,
+          &quot;awaited&quot;: false
+        },
+        {
+          &quot;variable&quot;: 1,
+          &quot;awaited&quot;: false
+        },
+        {
+          &quot;variable&quot;: 2,
+          &quot;awaited&quot;: false
+        },
+        {
+          &quot;variable&quot;: 3,
+          &quot;awaited&quot;: false
+        }
+      ],
+      &quot;native_initial&quot;: [
+        4,
+        5
+      ],
+      &quot;native_update&quot;: [
+        6,
+        7
+      ]
+    }
+  ],
+  &quot;invariants&quot;: [
+    {
+      &quot;identifier&quot;: &quot;invariant:mutual_exclusion&quot;,
+      &quot;auxiliary&quot;: false,
+      &quot;index&quot;: 6
+    },
+    {
+      &quot;identifier&quot;: &quot;auxiliary:control_locations&quot;,
+      &quot;auxiliary&quot;: true,
+      &quot;index&quot;: 7
+    },
+    {
+      &quot;identifier&quot;: &quot;auxiliary:priority&quot;,
+      &quot;auxiliary&quot;: true,
+      &quot;index&quot;: 8
+    }
+  ],
+  &quot;relations&quot;: [
+    {
+      &quot;name&quot;: &quot;initial&quot;,
+      &quot;identifier&quot;: &quot;relation:paper_initial&quot;,
+      &quot;index&quot;: 9
+    },
+    {
+      &quot;name&quot;: &quot;step&quot;,
+      &quot;identifier&quot;: &quot;relation:paper_round&quot;,
+      &quot;index&quot;: 10
+    }
+  ],
+  &quot;graphs&quot;: [
+    {
+      &quot;inputs&quot;: [],
+      &quot;terms&quot;: [
+        [
+          &quot;lit&quot;,
+          0
+        ],
+        [
+          &quot;bool&quot;,
+          false
+        ],
+        [
+          &quot;var&quot;,
+          0
+        ],
+        [
+          &quot;var&quot;,
+          1
+        ],
+        [
+          &quot;var&quot;,
+          0
+        ]
+      ],
+      &quot;outputs&quot;: [
+        2,
+        3,
+        4
+      ],
+      &quot;sorts&quot;: [
+        &quot;int&quot;,
+        &quot;bool&quot;,
+        &quot;int&quot;
+      ]
+    },
+    {
+      &quot;inputs&quot;: [],
+      &quot;terms&quot;: [
+        [
+          &quot;lit&quot;,
+          0
+        ],
+        [
+          &quot;bool&quot;,
+          true
+        ],
+        [
+          &quot;var&quot;,
+          0
+        ],
+        [
+          &quot;var&quot;,
+          1
+        ],
+        [
+          &quot;var&quot;,
+          0
+        ]
+      ],
+      &quot;outputs&quot;: [
+        2,
+        3,
+        4
+      ],
+      &quot;sorts&quot;: [
+        &quot;int&quot;,
+        &quot;bool&quot;,
+        &quot;int&quot;
+      ]
+    },
+    {
+      &quot;inputs&quot;: [
+        &quot;int&quot;,
+        &quot;bool&quot;,
+        &quot;int&quot;,
+        &quot;bool&quot;
+      ],
+      &quot;terms&quot;: [
+        [
+          &quot;lit&quot;,
+          0
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;eq&quot;,
+          [
+            &quot;var&quot;,
+            0
+          ],
+          [
+            &quot;var&quot;,
+            4
+          ]
+        ],
+        [
+          &quot;lit&quot;,
+          1
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;eq&quot;,
+          [
+            &quot;var&quot;,
+            0
+          ],
+          [
+            &quot;var&quot;,
+            6
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;eq&quot;,
+          [
+            &quot;var&quot;,
+            2
+          ],
+          [
+            &quot;var&quot;,
+            4
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            3
+          ],
+          [
+            &quot;bool&quot;,
+            false
+          ],
+          [
+            &quot;bool&quot;,
+            true
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            1
+          ],
+          [
+            &quot;var&quot;,
+            9
+          ],
+          [
+            &quot;var&quot;,
+            3
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;or&quot;,
+          [
+            &quot;var&quot;,
+            8
+          ],
+          [
+            &quot;var&quot;,
+            10
+          ]
+        ],
+        [
+          &quot;lit&quot;,
+          2
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            11
+          ],
+          [
+            &quot;var&quot;,
+            12
+          ],
+          [
+            &quot;var&quot;,
+            0
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;eq&quot;,
+          [
+            &quot;var&quot;,
+            0
+          ],
+          [
+            &quot;var&quot;,
+            12
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            14
+          ],
+          [
+            &quot;var&quot;,
+            4
+          ],
+          [
+            &quot;var&quot;,
+            0
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            7
+          ],
+          [
+            &quot;var&quot;,
+            13
+          ],
+          [
+            &quot;var&quot;,
+            15
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            5
+          ],
+          [
+            &quot;var&quot;,
+            6
+          ],
+          [
+            &quot;var&quot;,
+            16
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            5
+          ],
+          [
+            &quot;var&quot;,
+            3
+          ],
+          [
+            &quot;var&quot;,
+            1
+          ]
+        ],
+        [
+          &quot;var&quot;,
+          17
+        ],
+        [
+          &quot;var&quot;,
+          18
+        ],
+        [
+          &quot;var&quot;,
+          4
+        ]
+      ],
+      &quot;outputs&quot;: [
+        19,
+        20,
+        21
+      ],
+      &quot;sorts&quot;: [
+        &quot;int&quot;,
+        &quot;bool&quot;,
+        &quot;int&quot;
+      ]
+    },
+    {
+      &quot;inputs&quot;: [],
+      &quot;terms&quot;: [
+        [
+          &quot;lit&quot;,
+          0
+        ],
+        [
+          &quot;bool&quot;,
+          false
+        ],
+        [
+          &quot;var&quot;,
+          0
+        ],
+        [
+          &quot;var&quot;,
+          1
+        ],
+        [
+          &quot;var&quot;,
+          0
+        ]
+      ],
+      &quot;outputs&quot;: [
+        2,
+        3,
+        4
+      ],
+      &quot;sorts&quot;: [
+        &quot;int&quot;,
+        &quot;bool&quot;,
+        &quot;int&quot;
+      ]
+    },
+    {
+      &quot;inputs&quot;: [],
+      &quot;terms&quot;: [
+        [
+          &quot;lit&quot;,
+          0
+        ],
+        [
+          &quot;bool&quot;,
+          true
+        ],
+        [
+          &quot;var&quot;,
+          0
+        ],
+        [
+          &quot;var&quot;,
+          1
+        ],
+        [
+          &quot;var&quot;,
+          0
+        ]
+      ],
+      &quot;outputs&quot;: [
+        2,
+        3,
+        4
+      ],
+      &quot;sorts&quot;: [
+        &quot;int&quot;,
+        &quot;bool&quot;,
+        &quot;int&quot;
+      ]
+    },
+    {
+      &quot;inputs&quot;: [
+        &quot;int&quot;,
+        &quot;bool&quot;,
+        &quot;int&quot;,
+        &quot;bool&quot;
+      ],
+      &quot;terms&quot;: [
+        [
+          &quot;lit&quot;,
+          0
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;eq&quot;,
+          [
+            &quot;var&quot;,
+            0
+          ],
+          [
+            &quot;var&quot;,
+            4
+          ]
+        ],
+        [
+          &quot;lit&quot;,
+          1
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;eq&quot;,
+          [
+            &quot;var&quot;,
+            0
+          ],
+          [
+            &quot;var&quot;,
+            6
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;eq&quot;,
+          [
+            &quot;var&quot;,
+            2
+          ],
+          [
+            &quot;var&quot;,
+            4
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            3
+          ],
+          [
+            &quot;bool&quot;,
+            false
+          ],
+          [
+            &quot;bool&quot;,
+            true
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            1
+          ],
+          [
+            &quot;var&quot;,
+            3
+          ],
+          [
+            &quot;var&quot;,
+            9
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;or&quot;,
+          [
+            &quot;var&quot;,
+            8
+          ],
+          [
+            &quot;var&quot;,
+            10
+          ]
+        ],
+        [
+          &quot;lit&quot;,
+          2
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            11
+          ],
+          [
+            &quot;var&quot;,
+            12
+          ],
+          [
+            &quot;var&quot;,
+            0
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;eq&quot;,
+          [
+            &quot;var&quot;,
+            0
+          ],
+          [
+            &quot;var&quot;,
+            12
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            14
+          ],
+          [
+            &quot;var&quot;,
+            4
+          ],
+          [
+            &quot;var&quot;,
+            0
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            7
+          ],
+          [
+            &quot;var&quot;,
+            13
+          ],
+          [
+            &quot;var&quot;,
+            15
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            5
+          ],
+          [
+            &quot;var&quot;,
+            6
+          ],
+          [
+            &quot;var&quot;,
+            16
+          ]
+        ],
+        [
+          &quot;bool&quot;,
+          false
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            18
+          ],
+          [
+            &quot;bool&quot;,
+            false
+          ],
+          [
+            &quot;bool&quot;,
+            true
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            3
+          ],
+          [
+            &quot;var&quot;,
+            18
+          ],
+          [
+            &quot;var&quot;,
+            19
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            5
+          ],
+          [
+            &quot;var&quot;,
+            20
+          ],
+          [
+            &quot;var&quot;,
+            1
+          ]
+        ],
+        [
+          &quot;var&quot;,
+          17
+        ],
+        [
+          &quot;var&quot;,
+          21
+        ],
+        [
+          &quot;var&quot;,
+          4
+        ]
+      ],
+      &quot;outputs&quot;: [
+        22,
+        23,
+        24
+      ],
+      &quot;sorts&quot;: [
+        &quot;int&quot;,
+        &quot;bool&quot;,
+        &quot;int&quot;
+      ]
+    },
+    {
+      &quot;inputs&quot;: [
+        &quot;int&quot;,
+        &quot;int&quot;,
+        &quot;bool&quot;,
+        &quot;bool&quot;
+      ],
+      &quot;terms&quot;: [
+        [
+          &quot;lit&quot;,
+          2
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;eq&quot;,
+          [
+            &quot;var&quot;,
+            0
+          ],
+          [
+            &quot;var&quot;,
+            4
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;eq&quot;,
+          [
+            &quot;var&quot;,
+            1
+          ],
+          [
+            &quot;var&quot;,
+            4
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;and&quot;,
+          [
+            &quot;var&quot;,
+            5
+          ],
+          [
+            &quot;var&quot;,
+            6
+          ]
+        ],
+        [
+          &quot;bool&quot;,
+          false
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            8
+          ],
+          [
+            &quot;bool&quot;,
+            false
+          ],
+          [
+            &quot;bool&quot;,
+            true
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            7
+          ],
+          [
+            &quot;var&quot;,
+            8
+          ],
+          [
+            &quot;var&quot;,
+            9
+          ]
+        ],
+        [
+          &quot;var&quot;,
+          10
+        ]
+      ],
+      &quot;outputs&quot;: [
+        11
+      ],
+      &quot;sorts&quot;: [
+        &quot;bool&quot;
+      ]
+    },
+    {
+      &quot;inputs&quot;: [
+        &quot;int&quot;,
+        &quot;int&quot;,
+        &quot;bool&quot;,
+        &quot;bool&quot;
+      ],
+      &quot;terms&quot;: [
+        [
+          &quot;lit&quot;,
+          0
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;le&quot;,
+          [
+            &quot;var&quot;,
+            4
+          ],
+          [
+            &quot;var&quot;,
+            0
+          ]
+        ],
+        [
+          &quot;lit&quot;,
+          2
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;le&quot;,
+          [
+            &quot;var&quot;,
+            0
+          ],
+          [
+            &quot;var&quot;,
+            6
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;and&quot;,
+          [
+            &quot;var&quot;,
+            5
+          ],
+          [
+            &quot;var&quot;,
+            7
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;le&quot;,
+          [
+            &quot;var&quot;,
+            4
+          ],
+          [
+            &quot;var&quot;,
+            1
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;le&quot;,
+          [
+            &quot;var&quot;,
+            1
+          ],
+          [
+            &quot;var&quot;,
+            6
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;and&quot;,
+          [
+            &quot;var&quot;,
+            9
+          ],
+          [
+            &quot;var&quot;,
+            10
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;and&quot;,
+          [
+            &quot;var&quot;,
+            8
+          ],
+          [
+            &quot;var&quot;,
+            11
+          ]
+        ],
+        [
+          &quot;var&quot;,
+          12
+        ]
+      ],
+      &quot;outputs&quot;: [
+        13
+      ],
+      &quot;sorts&quot;: [
+        &quot;bool&quot;
+      ]
+    },
+    {
+      &quot;inputs&quot;: [
+        &quot;int&quot;,
+        &quot;int&quot;,
+        &quot;bool&quot;,
+        &quot;bool&quot;
+      ],
+      &quot;terms&quot;: [
+        [
+          &quot;lit&quot;,
+          2
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;ne&quot;,
+          [
+            &quot;var&quot;,
+            0
+          ],
+          [
+            &quot;var&quot;,
+            4
+          ]
+        ],
+        [
+          &quot;lit&quot;,
+          1
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;ne&quot;,
+          [
+            &quot;var&quot;,
+            1
+          ],
+          [
+            &quot;var&quot;,
+            6
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;or&quot;,
+          [
+            &quot;var&quot;,
+            5
+          ],
+          [
+            &quot;var&quot;,
+            7
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            3
+          ],
+          [
+            &quot;bool&quot;,
+            false
+          ],
+          [
+            &quot;bool&quot;,
+            true
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            2
+          ],
+          [
+            &quot;var&quot;,
+            9
+          ],
+          [
+            &quot;var&quot;,
+            3
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;or&quot;,
+          [
+            &quot;var&quot;,
+            8
+          ],
+          [
+            &quot;var&quot;,
+            10
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;ne&quot;,
+          [
+            &quot;var&quot;,
+            1
+          ],
+          [
+            &quot;var&quot;,
+            4
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;ne&quot;,
+          [
+            &quot;var&quot;,
+            0
+          ],
+          [
+            &quot;var&quot;,
+            6
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;or&quot;,
+          [
+            &quot;var&quot;,
+            12
+          ],
+          [
+            &quot;var&quot;,
+            13
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            3
+          ],
+          [
+            &quot;bool&quot;,
+            false
+          ],
+          [
+            &quot;bool&quot;,
+            true
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            2
+          ],
+          [
+            &quot;var&quot;,
+            3
+          ],
+          [
+            &quot;var&quot;,
+            15
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;or&quot;,
+          [
+            &quot;var&quot;,
+            14
+          ],
+          [
+            &quot;var&quot;,
+            16
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;and&quot;,
+          [
+            &quot;var&quot;,
+            11
+          ],
+          [
+            &quot;var&quot;,
+            17
+          ]
+        ],
+        [
+          &quot;var&quot;,
+          18
+        ]
+      ],
+      &quot;outputs&quot;: [
+        19
+      ],
+      &quot;sorts&quot;: [
+        &quot;bool&quot;
+      ]
+    },
+    {
+      &quot;inputs&quot;: [
+        &quot;int&quot;,
+        &quot;int&quot;,
+        &quot;bool&quot;,
+        &quot;bool&quot;
+      ],
+      &quot;terms&quot;: [
+        [
+          &quot;lit&quot;,
+          0
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;eq&quot;,
+          [
+            &quot;var&quot;,
+            0
+          ],
+          [
+            &quot;var&quot;,
+            4
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;eq&quot;,
+          [
+            &quot;var&quot;,
+            1
+          ],
+          [
+            &quot;var&quot;,
+            4
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;and&quot;,
+          [
+            &quot;var&quot;,
+            5
+          ],
+          [
+            &quot;var&quot;,
+            6
+          ]
+        ],
+        [
+          &quot;var&quot;,
+          7
+        ]
+      ],
+      &quot;outputs&quot;: [
+        8
+      ],
+      &quot;sorts&quot;: [
+        &quot;bool&quot;
+      ]
+    },
+    {
+      &quot;inputs&quot;: [
+        &quot;int&quot;,
+        &quot;int&quot;,
+        &quot;bool&quot;,
+        &quot;bool&quot;,
+        &quot;int&quot;,
+        &quot;int&quot;,
+        &quot;bool&quot;,
+        &quot;bool&quot;
+      ],
+      &quot;terms&quot;: [
+        [
+          &quot;bin&quot;,
+          &quot;eq&quot;,
+          [
+            &quot;var&quot;,
+            4
+          ],
+          [
+            &quot;var&quot;,
+            0
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            2
+          ],
+          [
+            &quot;bool&quot;,
+            false
+          ],
+          [
+            &quot;bool&quot;,
+            true
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            6
+          ],
+          [
+            &quot;var&quot;,
+            2
+          ],
+          [
+            &quot;var&quot;,
+            9
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;and&quot;,
+          [
+            &quot;var&quot;,
+            8
+          ],
+          [
+            &quot;var&quot;,
+            10
+          ]
+        ],
+        [
+          &quot;lit&quot;,
+          0
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;eq&quot;,
+          [
+            &quot;var&quot;,
+            0
+          ],
+          [
+            &quot;var&quot;,
+            12
+          ]
+        ],
+        [
+          &quot;lit&quot;,
+          1
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;eq&quot;,
+          [
+            &quot;var&quot;,
+            4
+          ],
+          [
+            &quot;var&quot;,
+            14
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;and&quot;,
+          [
+            &quot;var&quot;,
+            13
+          ],
+          [
+            &quot;var&quot;,
+            15
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            3
+          ],
+          [
+            &quot;bool&quot;,
+            false
+          ],
+          [
+            &quot;bool&quot;,
+            true
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            6
+          ],
+          [
+            &quot;var&quot;,
+            3
+          ],
+          [
+            &quot;var&quot;,
+            17
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;and&quot;,
+          [
+            &quot;var&quot;,
+            16
+          ],
+          [
+            &quot;var&quot;,
+            18
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;or&quot;,
+          [
+            &quot;var&quot;,
+            11
+          ],
+          [
+            &quot;var&quot;,
+            19
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;eq&quot;,
+          [
+            &quot;var&quot;,
+            0
+          ],
+          [
+            &quot;var&quot;,
+            14
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;eq&quot;,
+          [
+            &quot;var&quot;,
+            1
+          ],
+          [
+            &quot;var&quot;,
+            12
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            3
+          ],
+          [
+            &quot;bool&quot;,
+            false
+          ],
+          [
+            &quot;bool&quot;,
+            true
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            2
+          ],
+          [
+            &quot;var&quot;,
+            23
+          ],
+          [
+            &quot;var&quot;,
+            3
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;or&quot;,
+          [
+            &quot;var&quot;,
+            22
+          ],
+          [
+            &quot;var&quot;,
+            24
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;and&quot;,
+          [
+            &quot;var&quot;,
+            21
+          ],
+          [
+            &quot;var&quot;,
+            25
+          ]
+        ],
+        [
+          &quot;lit&quot;,
+          2
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;eq&quot;,
+          [
+            &quot;var&quot;,
+            4
+          ],
+          [
+            &quot;var&quot;,
+            27
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;and&quot;,
+          [
+            &quot;var&quot;,
+            26
+          ],
+          [
+            &quot;var&quot;,
+            28
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;and&quot;,
+          [
+            &quot;var&quot;,
+            29
+          ],
+          [
+            &quot;var&quot;,
+            10
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;or&quot;,
+          [
+            &quot;var&quot;,
+            20
+          ],
+          [
+            &quot;var&quot;,
+            30
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;eq&quot;,
+          [
+            &quot;var&quot;,
+            0
+          ],
+          [
+            &quot;var&quot;,
+            27
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;eq&quot;,
+          [
+            &quot;var&quot;,
+            4
+          ],
+          [
+            &quot;var&quot;,
+            12
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;and&quot;,
+          [
+            &quot;var&quot;,
+            32
+          ],
+          [
+            &quot;var&quot;,
+            33
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;and&quot;,
+          [
+            &quot;var&quot;,
+            34
+          ],
+          [
+            &quot;var&quot;,
+            10
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;or&quot;,
+          [
+            &quot;var&quot;,
+            31
+          ],
+          [
+            &quot;var&quot;,
+            35
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;eq&quot;,
+          [
+            &quot;var&quot;,
+            5
+          ],
+          [
+            &quot;var&quot;,
+            1
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            3
+          ],
+          [
+            &quot;bool&quot;,
+            false
+          ],
+          [
+            &quot;bool&quot;,
+            true
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            7
+          ],
+          [
+            &quot;var&quot;,
+            3
+          ],
+          [
+            &quot;var&quot;,
+            38
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;and&quot;,
+          [
+            &quot;var&quot;,
+            37
+          ],
+          [
+            &quot;var&quot;,
+            39
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;eq&quot;,
+          [
+            &quot;var&quot;,
+            5
+          ],
+          [
+            &quot;var&quot;,
+            14
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;and&quot;,
+          [
+            &quot;var&quot;,
+            22
+          ],
+          [
+            &quot;var&quot;,
+            41
+          ]
+        ],
+        [
+          &quot;bool&quot;,
+          false
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            43
+          ],
+          [
+            &quot;bool&quot;,
+            false
+          ],
+          [
+            &quot;bool&quot;,
+            true
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            2
+          ],
+          [
+            &quot;var&quot;,
+            43
+          ],
+          [
+            &quot;var&quot;,
+            44
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            45
+          ],
+          [
+            &quot;bool&quot;,
+            false
+          ],
+          [
+            &quot;bool&quot;,
+            true
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            7
+          ],
+          [
+            &quot;var&quot;,
+            45
+          ],
+          [
+            &quot;var&quot;,
+            46
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;and&quot;,
+          [
+            &quot;var&quot;,
+            42
+          ],
+          [
+            &quot;var&quot;,
+            47
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;or&quot;,
+          [
+            &quot;var&quot;,
+            40
+          ],
+          [
+            &quot;var&quot;,
+            48
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;eq&quot;,
+          [
+            &quot;var&quot;,
+            1
+          ],
+          [
+            &quot;var&quot;,
+            14
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            3
+          ],
+          [
+            &quot;bool&quot;,
+            false
+          ],
+          [
+            &quot;bool&quot;,
+            true
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            2
+          ],
+          [
+            &quot;var&quot;,
+            3
+          ],
+          [
+            &quot;var&quot;,
+            51
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;or&quot;,
+          [
+            &quot;var&quot;,
+            13
+          ],
+          [
+            &quot;var&quot;,
+            52
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;and&quot;,
+          [
+            &quot;var&quot;,
+            50
+          ],
+          [
+            &quot;var&quot;,
+            53
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;eq&quot;,
+          [
+            &quot;var&quot;,
+            5
+          ],
+          [
+            &quot;var&quot;,
+            27
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;and&quot;,
+          [
+            &quot;var&quot;,
+            54
+          ],
+          [
+            &quot;var&quot;,
+            55
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;and&quot;,
+          [
+            &quot;var&quot;,
+            56
+          ],
+          [
+            &quot;var&quot;,
+            39
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;or&quot;,
+          [
+            &quot;var&quot;,
+            49
+          ],
+          [
+            &quot;var&quot;,
+            57
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;eq&quot;,
+          [
+            &quot;var&quot;,
+            1
+          ],
+          [
+            &quot;var&quot;,
+            27
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;eq&quot;,
+          [
+            &quot;var&quot;,
+            5
+          ],
+          [
+            &quot;var&quot;,
+            12
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;and&quot;,
+          [
+            &quot;var&quot;,
+            59
+          ],
+          [
+            &quot;var&quot;,
+            60
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;and&quot;,
+          [
+            &quot;var&quot;,
+            61
+          ],
+          [
+            &quot;var&quot;,
+            39
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;or&quot;,
+          [
+            &quot;var&quot;,
+            58
+          ],
+          [
+            &quot;var&quot;,
+            62
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;and&quot;,
+          [
+            &quot;var&quot;,
+            36
+          ],
+          [
+            &quot;var&quot;,
+            63
+          ]
+        ],
+        [
+          &quot;var&quot;,
+          64
+        ]
+      ],
+      &quot;outputs&quot;: [
+        65
+      ],
+      &quot;sorts&quot;: [
+        &quot;bool&quot;
+      ]
+    }
+  ],
+  &quot;native_graphs&quot;: [
+    {
+      &quot;inputs&quot;: [],
+      &quot;terms&quot;: [
+        [
+          &quot;bool&quot;,
+          false
+        ],
+        [
+          &quot;lit&quot;,
+          0
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            0
+          ],
+          [
+            &quot;var&quot;,
+            1
+          ],
+          [
+            &quot;var&quot;,
+            1
+          ]
+        ],
+        [
+          &quot;bool&quot;,
+          false
+        ],
+        [
+          &quot;bool&quot;,
+          true
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            0
+          ],
+          [
+            &quot;var&quot;,
+            3
+          ],
+          [
+            &quot;var&quot;,
+            4
+          ]
+        ],
+        [
+          &quot;var&quot;,
+          2
+        ],
+        [
+          &quot;var&quot;,
+          5
+        ]
+      ],
+      &quot;outputs&quot;: [
+        6,
+        7
+      ],
+      &quot;sorts&quot;: [
+        &quot;int&quot;,
+        &quot;bool&quot;
+      ]
+    },
+    {
+      &quot;inputs&quot;: [],
+      &quot;terms&quot;: [
+        [
+          &quot;bool&quot;,
+          true
+        ],
+        [
+          &quot;lit&quot;,
+          0
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            0
+          ],
+          [
+            &quot;var&quot;,
+            1
+          ],
+          [
+            &quot;var&quot;,
+            1
+          ]
+        ],
+        [
+          &quot;bool&quot;,
+          false
+        ],
+        [
+          &quot;bool&quot;,
+          true
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            0
+          ],
+          [
+            &quot;var&quot;,
+            3
+          ],
+          [
+            &quot;var&quot;,
+            4
+          ]
+        ],
+        [
+          &quot;var&quot;,
+          2
+        ],
+        [
+          &quot;var&quot;,
+          5
+        ]
+      ],
+      &quot;outputs&quot;: [
+        6,
+        7
+      ],
+      &quot;sorts&quot;: [
+        &quot;int&quot;,
+        &quot;bool&quot;
+      ]
+    },
+    {
+      &quot;inputs&quot;: [
+        &quot;int&quot;,
+        &quot;int&quot;,
+        &quot;bool&quot;,
+        &quot;bool&quot;
+      ],
+      &quot;terms&quot;: [
+        [
+          &quot;bool&quot;,
+          false
+        ],
+        [
+          &quot;lit&quot;,
+          0
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;eq&quot;,
+          [
+            &quot;var&quot;,
+            0
+          ],
+          [
+            &quot;var&quot;,
+            5
+          ]
+        ],
+        [
+          &quot;lit&quot;,
+          1
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;eq&quot;,
+          [
+            &quot;var&quot;,
+            0
+          ],
+          [
+            &quot;var&quot;,
+            7
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;eq&quot;,
+          [
+            &quot;var&quot;,
+            1
+          ],
+          [
+            &quot;var&quot;,
+            5
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            3
+          ],
+          [
+            &quot;bool&quot;,
+            false
+          ],
+          [
+            &quot;bool&quot;,
+            true
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            2
+          ],
+          [
+            &quot;var&quot;,
+            10
+          ],
+          [
+            &quot;var&quot;,
+            3
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;or&quot;,
+          [
+            &quot;var&quot;,
+            9
+          ],
+          [
+            &quot;var&quot;,
+            11
+          ]
+        ],
+        [
+          &quot;lit&quot;,
+          2
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            12
+          ],
+          [
+            &quot;var&quot;,
+            13
+          ],
+          [
+            &quot;var&quot;,
+            0
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;eq&quot;,
+          [
+            &quot;var&quot;,
+            0
+          ],
+          [
+            &quot;var&quot;,
+            13
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            15
+          ],
+          [
+            &quot;var&quot;,
+            5
+          ],
+          [
+            &quot;var&quot;,
+            0
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            8
+          ],
+          [
+            &quot;var&quot;,
+            14
+          ],
+          [
+            &quot;var&quot;,
+            16
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            6
+          ],
+          [
+            &quot;var&quot;,
+            7
+          ],
+          [
+            &quot;var&quot;,
+            17
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            4
+          ],
+          [
+            &quot;var&quot;,
+            0
+          ],
+          [
+            &quot;var&quot;,
+            18
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            6
+          ],
+          [
+            &quot;var&quot;,
+            3
+          ],
+          [
+            &quot;var&quot;,
+            2
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            4
+          ],
+          [
+            &quot;var&quot;,
+            2
+          ],
+          [
+            &quot;var&quot;,
+            20
+          ]
+        ],
+        [
+          &quot;var&quot;,
+          19
+        ],
+        [
+          &quot;var&quot;,
+          21
+        ]
+      ],
+      &quot;outputs&quot;: [
+        22,
+        23
+      ],
+      &quot;sorts&quot;: [
+        &quot;int&quot;,
+        &quot;bool&quot;
+      ]
+    },
+    {
+      &quot;inputs&quot;: [
+        &quot;int&quot;,
+        &quot;int&quot;,
+        &quot;bool&quot;,
+        &quot;bool&quot;
+      ],
+      &quot;terms&quot;: [
+        [
+          &quot;bool&quot;,
+          true
+        ],
+        [
+          &quot;lit&quot;,
+          0
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;eq&quot;,
+          [
+            &quot;var&quot;,
+            0
+          ],
+          [
+            &quot;var&quot;,
+            5
+          ]
+        ],
+        [
+          &quot;lit&quot;,
+          1
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;eq&quot;,
+          [
+            &quot;var&quot;,
+            0
+          ],
+          [
+            &quot;var&quot;,
+            7
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;eq&quot;,
+          [
+            &quot;var&quot;,
+            1
+          ],
+          [
+            &quot;var&quot;,
+            5
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            3
+          ],
+          [
+            &quot;bool&quot;,
+            false
+          ],
+          [
+            &quot;bool&quot;,
+            true
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            2
+          ],
+          [
+            &quot;var&quot;,
+            10
+          ],
+          [
+            &quot;var&quot;,
+            3
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;or&quot;,
+          [
+            &quot;var&quot;,
+            9
+          ],
+          [
+            &quot;var&quot;,
+            11
+          ]
+        ],
+        [
+          &quot;lit&quot;,
+          2
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            12
+          ],
+          [
+            &quot;var&quot;,
+            13
+          ],
+          [
+            &quot;var&quot;,
+            0
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;eq&quot;,
+          [
+            &quot;var&quot;,
+            0
+          ],
+          [
+            &quot;var&quot;,
+            13
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            15
+          ],
+          [
+            &quot;var&quot;,
+            5
+          ],
+          [
+            &quot;var&quot;,
+            0
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            8
+          ],
+          [
+            &quot;var&quot;,
+            14
+          ],
+          [
+            &quot;var&quot;,
+            16
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            6
+          ],
+          [
+            &quot;var&quot;,
+            7
+          ],
+          [
+            &quot;var&quot;,
+            17
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            4
+          ],
+          [
+            &quot;var&quot;,
+            0
+          ],
+          [
+            &quot;var&quot;,
+            18
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            6
+          ],
+          [
+            &quot;var&quot;,
+            3
+          ],
+          [
+            &quot;var&quot;,
+            2
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            4
+          ],
+          [
+            &quot;var&quot;,
+            2
+          ],
+          [
+            &quot;var&quot;,
+            20
+          ]
+        ],
+        [
+          &quot;var&quot;,
+          19
+        ],
+        [
+          &quot;var&quot;,
+          21
+        ]
+      ],
+      &quot;outputs&quot;: [
+        22,
+        23
+      ],
+      &quot;sorts&quot;: [
+        &quot;int&quot;,
+        &quot;bool&quot;
+      ]
+    },
+    {
+      &quot;inputs&quot;: [],
+      &quot;terms&quot;: [
+        [
+          &quot;bool&quot;,
+          false
+        ],
+        [
+          &quot;lit&quot;,
+          0
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            0
+          ],
+          [
+            &quot;var&quot;,
+            1
+          ],
+          [
+            &quot;var&quot;,
+            1
+          ]
+        ],
+        [
+          &quot;bool&quot;,
+          false
+        ],
+        [
+          &quot;bool&quot;,
+          true
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            0
+          ],
+          [
+            &quot;var&quot;,
+            3
+          ],
+          [
+            &quot;var&quot;,
+            4
+          ]
+        ],
+        [
+          &quot;var&quot;,
+          2
+        ],
+        [
+          &quot;var&quot;,
+          5
+        ]
+      ],
+      &quot;outputs&quot;: [
+        6,
+        7
+      ],
+      &quot;sorts&quot;: [
+        &quot;int&quot;,
+        &quot;bool&quot;
+      ]
+    },
+    {
+      &quot;inputs&quot;: [],
+      &quot;terms&quot;: [
+        [
+          &quot;bool&quot;,
+          true
+        ],
+        [
+          &quot;lit&quot;,
+          0
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            0
+          ],
+          [
+            &quot;var&quot;,
+            1
+          ],
+          [
+            &quot;var&quot;,
+            1
+          ]
+        ],
+        [
+          &quot;bool&quot;,
+          false
+        ],
+        [
+          &quot;bool&quot;,
+          true
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            0
+          ],
+          [
+            &quot;var&quot;,
+            3
+          ],
+          [
+            &quot;var&quot;,
+            4
+          ]
+        ],
+        [
+          &quot;var&quot;,
+          2
+        ],
+        [
+          &quot;var&quot;,
+          5
+        ]
+      ],
+      &quot;outputs&quot;: [
+        6,
+        7
+      ],
+      &quot;sorts&quot;: [
+        &quot;int&quot;,
+        &quot;bool&quot;
+      ]
+    },
+    {
+      &quot;inputs&quot;: [
+        &quot;int&quot;,
+        &quot;int&quot;,
+        &quot;bool&quot;,
+        &quot;bool&quot;
+      ],
+      &quot;terms&quot;: [
+        [
+          &quot;bool&quot;,
+          false
+        ],
+        [
+          &quot;lit&quot;,
+          0
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;eq&quot;,
+          [
+            &quot;var&quot;,
+            1
+          ],
+          [
+            &quot;var&quot;,
+            5
+          ]
+        ],
+        [
+          &quot;lit&quot;,
+          1
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;eq&quot;,
+          [
+            &quot;var&quot;,
+            1
+          ],
+          [
+            &quot;var&quot;,
+            7
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;eq&quot;,
+          [
+            &quot;var&quot;,
+            0
+          ],
+          [
+            &quot;var&quot;,
+            5
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            2
+          ],
+          [
+            &quot;bool&quot;,
+            false
+          ],
+          [
+            &quot;bool&quot;,
+            true
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            3
+          ],
+          [
+            &quot;var&quot;,
+            2
+          ],
+          [
+            &quot;var&quot;,
+            10
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;or&quot;,
+          [
+            &quot;var&quot;,
+            9
+          ],
+          [
+            &quot;var&quot;,
+            11
+          ]
+        ],
+        [
+          &quot;lit&quot;,
+          2
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            12
+          ],
+          [
+            &quot;var&quot;,
+            13
+          ],
+          [
+            &quot;var&quot;,
+            1
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;eq&quot;,
+          [
+            &quot;var&quot;,
+            1
+          ],
+          [
+            &quot;var&quot;,
+            13
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            15
+          ],
+          [
+            &quot;var&quot;,
+            5
+          ],
+          [
+            &quot;var&quot;,
+            1
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            8
+          ],
+          [
+            &quot;var&quot;,
+            14
+          ],
+          [
+            &quot;var&quot;,
+            16
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            6
+          ],
+          [
+            &quot;var&quot;,
+            7
+          ],
+          [
+            &quot;var&quot;,
+            17
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            4
+          ],
+          [
+            &quot;var&quot;,
+            1
+          ],
+          [
+            &quot;var&quot;,
+            18
+          ]
+        ],
+        [
+          &quot;bool&quot;,
+          false
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            20
+          ],
+          [
+            &quot;bool&quot;,
+            false
+          ],
+          [
+            &quot;bool&quot;,
+            true
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            2
+          ],
+          [
+            &quot;var&quot;,
+            20
+          ],
+          [
+            &quot;var&quot;,
+            21
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            6
+          ],
+          [
+            &quot;var&quot;,
+            22
+          ],
+          [
+            &quot;var&quot;,
+            3
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            4
+          ],
+          [
+            &quot;var&quot;,
+            3
+          ],
+          [
+            &quot;var&quot;,
+            23
+          ]
+        ],
+        [
+          &quot;var&quot;,
+          19
+        ],
+        [
+          &quot;var&quot;,
+          24
+        ]
+      ],
+      &quot;outputs&quot;: [
+        25,
+        26
+      ],
+      &quot;sorts&quot;: [
+        &quot;int&quot;,
+        &quot;bool&quot;
+      ]
+    },
+    {
+      &quot;inputs&quot;: [
+        &quot;int&quot;,
+        &quot;int&quot;,
+        &quot;bool&quot;,
+        &quot;bool&quot;
+      ],
+      &quot;terms&quot;: [
+        [
+          &quot;bool&quot;,
+          true
+        ],
+        [
+          &quot;lit&quot;,
+          0
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;eq&quot;,
+          [
+            &quot;var&quot;,
+            1
+          ],
+          [
+            &quot;var&quot;,
+            5
+          ]
+        ],
+        [
+          &quot;lit&quot;,
+          1
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;eq&quot;,
+          [
+            &quot;var&quot;,
+            1
+          ],
+          [
+            &quot;var&quot;,
+            7
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;eq&quot;,
+          [
+            &quot;var&quot;,
+            0
+          ],
+          [
+            &quot;var&quot;,
+            5
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            2
+          ],
+          [
+            &quot;bool&quot;,
+            false
+          ],
+          [
+            &quot;bool&quot;,
+            true
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            3
+          ],
+          [
+            &quot;var&quot;,
+            2
+          ],
+          [
+            &quot;var&quot;,
+            10
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;or&quot;,
+          [
+            &quot;var&quot;,
+            9
+          ],
+          [
+            &quot;var&quot;,
+            11
+          ]
+        ],
+        [
+          &quot;lit&quot;,
+          2
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            12
+          ],
+          [
+            &quot;var&quot;,
+            13
+          ],
+          [
+            &quot;var&quot;,
+            1
+          ]
+        ],
+        [
+          &quot;bin&quot;,
+          &quot;eq&quot;,
+          [
+            &quot;var&quot;,
+            1
+          ],
+          [
+            &quot;var&quot;,
+            13
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            15
+          ],
+          [
+            &quot;var&quot;,
+            5
+          ],
+          [
+            &quot;var&quot;,
+            1
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            8
+          ],
+          [
+            &quot;var&quot;,
+            14
+          ],
+          [
+            &quot;var&quot;,
+            16
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            6
+          ],
+          [
+            &quot;var&quot;,
+            7
+          ],
+          [
+            &quot;var&quot;,
+            17
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            4
+          ],
+          [
+            &quot;var&quot;,
+            1
+          ],
+          [
+            &quot;var&quot;,
+            18
+          ]
+        ],
+        [
+          &quot;bool&quot;,
+          false
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            20
+          ],
+          [
+            &quot;bool&quot;,
+            false
+          ],
+          [
+            &quot;bool&quot;,
+            true
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            2
+          ],
+          [
+            &quot;var&quot;,
+            20
+          ],
+          [
+            &quot;var&quot;,
+            21
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            6
+          ],
+          [
+            &quot;var&quot;,
+            22
+          ],
+          [
+            &quot;var&quot;,
+            3
+          ]
+        ],
+        [
+          &quot;ite&quot;,
+          [
+            &quot;var&quot;,
+            4
+          ],
+          [
+            &quot;var&quot;,
+            3
+          ],
+          [
+            &quot;var&quot;,
+            23
+          ]
+        ],
+        [
+          &quot;var&quot;,
+          19
+        ],
+        [
+          &quot;var&quot;,
+          24
+        ]
+      ],
+      &quot;outputs&quot;: [
+        25,
+        26
+      ],
+      &quot;sorts&quot;: [
+        &quot;int&quot;,
+        &quot;bool&quot;
+      ]
+    }
+  ],
+  &quot;native_module&quot;: &quot;module\n  interface\n    pc1 : Int([1,1])\n    pc2 : Int([1,1])\n    x1 : Bool([1,1])\n    x2 : Bool([1,1])\n  atom controls pc1, x1 reads pc1, pc2, x1, x2\n  init\n    #310 := AnyBool \n    #311 := [[0]] \n    #312 := Ite (#310, #311, #311)\n    #313 := [[false]] \n    #314 := [[true]] \n    #315 := Ite (#310, #313, #314)\n    X(pc1) := Id #312\n    X(x1) := Id #315\n  delay\n    d(pc1) := ZERO \n    d(x1) := ZERO \n  update\n    #316 := AnyBool \n    #317 := [[0]] \n    #318 := Eq (pc1, #317)\n    #319 := [[1]] \n    #320 := Eq (pc1, #319)\n    #321 := Eq (pc2, #317)\n    #322 := Not x2\n    #323 := Ite (x1, #322, x2)\n    #324 := Or (#321, #323)\n    #325 := [[2]] \n    #326 := Ite (#324, #325, pc1)\n    #327 := Eq (pc1, #325)\n    #328 := Ite (#327, #317, pc1)\n    #329 := Ite (#320, #326, #328)\n    #330 := Ite (#318, #319, #329)\n    #331 := Ite (#316, pc1, #330)\n    #332 := Ite (#318, x2, x1)\n    #333 := Ite (#316, x1, #332)\n    X(pc1) := Id #331\n    X(x1) := Id #333\n  atom controls pc2, x2 reads pc1, pc2, x1, x2\n  init\n    #334 := AnyBool \n    #335 := [[0]] \n    #336 := Ite (#334, #335, #335)\n    #337 := [[false]] \n    #338 := [[true]] \n    #339 := Ite (#334, #337, #338)\n    X(pc2) := Id #336\n    X(x2) := Id #339\n  delay\n    d(pc2) := ZERO \n    d(x2) := ZERO \n  update\n    #340 := AnyBool \n    #341 := [[0]] \n    #342 := Eq (pc2, #341)\n    #343 := [[1]] \n    #344 := Eq (pc2, #343)\n    #345 := Eq (pc1, #341)\n    #346 := Not x1\n    #347 := Ite (x2, x1, #346)\n    #348 := Or (#345, #347)\n    #349 := [[2]] \n    #350 := Ite (#348, #349, pc2)\n    #351 := Eq (pc2, #349)\n    #352 := Ite (#351, #341, pc2)\n    #353 := Ite (#344, #350, #352)\n    #354 := Ite (#342, #343, #353)\n    #355 := Ite (#340, pc2, #354)\n    #356 := [[false]] \n    #357 := Not #356\n    #358 := Ite (x1, #356, #357)\n    #359 := Ite (#342, #358, x2)\n    #360 := Ite (#340, x2, #359)\n    X(pc2) := Id #355\n    X(x2) := Id #360\n&quot;,
+  &quot;programs&quot;: [
+    {
+      &quot;name&quot;: &quot;__init__&quot;,
+      &quot;body&quot;: [
+        &quot;seq&quot;,
+        [
+          &quot;assign&quot;,
+          2,
+          [
+            &quot;bool&quot;,
+            false
+          ]
+        ],
+        [
+          &quot;seq&quot;,
+          [
+            &quot;assign&quot;,
+            0,
+            [
+              &quot;lit&quot;,
+              0
+            ]
+          ],
+          [
+            &quot;seq&quot;,
+            [
+              &quot;assign&quot;,
+              1,
+              [
+                &quot;var&quot;,
+                2
+              ]
+            ],
+            [
+              &quot;skip&quot;
+            ]
+          ]
+        ]
+      ],
+      &quot;inputs&quot;: [],
+      &quot;slots&quot;: [
+        &quot;int&quot;,
+        &quot;bool&quot;,
+        &quot;bool&quot;
+      ],
+      &quot;fields&quot;: 2,
+      &quot;result&quot;: &quot;none&quot;,
+      &quot;initialize&quot;: true
+    },
+    {
+      &quot;name&quot;: &quot;__init__&quot;,
+      &quot;body&quot;: [
+        &quot;seq&quot;,
+        [
+          &quot;assign&quot;,
+          2,
+          [
+            &quot;bool&quot;,
+            true
+          ]
+        ],
+        [
+          &quot;seq&quot;,
+          [
+            &quot;assign&quot;,
+            0,
+            [
+              &quot;lit&quot;,
+              0
+            ]
+          ],
+          [
+            &quot;seq&quot;,
+            [
+              &quot;assign&quot;,
+              1,
+              [
+                &quot;var&quot;,
+                2
+              ]
+            ],
+            [
+              &quot;skip&quot;
+            ]
+          ]
+        ]
+      ],
+      &quot;inputs&quot;: [],
+      &quot;slots&quot;: [
+        &quot;int&quot;,
+        &quot;bool&quot;,
+        &quot;bool&quot;
+      ],
+      &quot;fields&quot;: 2,
+      &quot;result&quot;: &quot;none&quot;,
+      &quot;initialize&quot;: true
+    },
+    {
+      &quot;name&quot;: &quot;advance&quot;,
+      &quot;body&quot;: [
+        &quot;seq&quot;,
+        [
+          &quot;branch&quot;,
+          [
+            &quot;bin&quot;,
+            &quot;eq&quot;,
+            [
+              &quot;var&quot;,
+              0
+            ],
+            [
+              &quot;lit&quot;,
+              0
+            ]
+          ],
+          [
+            &quot;seq&quot;,
+            [
+              &quot;assign&quot;,
+              0,
+              [
+                &quot;lit&quot;,
+                1
+              ]
+            ],
+            [
+              &quot;seq&quot;,
+              [
+                &quot;assign&quot;,
+                1,
+                [
+                  &quot;var&quot;,
+                  3
+                ]
+              ],
+              [
+                &quot;skip&quot;
+              ]
+            ]
+          ],
+          [
+            &quot;seq&quot;,
+            [
+              &quot;branch&quot;,
+              [
+                &quot;bin&quot;,
+                &quot;eq&quot;,
+                [
+                  &quot;var&quot;,
+                  0
+                ],
+                [
+                  &quot;lit&quot;,
+                  1
+                ]
+              ],
+              [
+                &quot;seq&quot;,
+                [
+                  &quot;branch&quot;,
+                  [
+                    &quot;bin&quot;,
+                    &quot;or&quot;,
+                    [
+                      &quot;bin&quot;,
+                      &quot;eq&quot;,
+                      [
+                        &quot;var&quot;,
+                        2
+                      ],
+                      [
+                        &quot;lit&quot;,
+                        0
+                      ]
+                    ],
+                    [
+                      &quot;bin&quot;,
+                      &quot;ne&quot;,
+                      [
+                        &quot;var&quot;,
+                        1
+                      ],
+                      [
+                        &quot;var&quot;,
+                        3
+                      ]
+                    ]
+                  ],
+                  [
+                    &quot;seq&quot;,
+                    [
+                      &quot;assign&quot;,
+                      0,
+                      [
+                        &quot;lit&quot;,
+                        2
+                      ]
+                    ],
+                    [
+                      &quot;skip&quot;
+                    ]
+                  ],
+                  [
+                    &quot;skip&quot;
+                  ]
+                ],
+                [
+                  &quot;skip&quot;
+                ]
+              ],
+              [
+                &quot;seq&quot;,
+                [
+                  &quot;branch&quot;,
+                  [
+                    &quot;bin&quot;,
+                    &quot;eq&quot;,
+                    [
+                      &quot;var&quot;,
+                      0
+                    ],
+                    [
+                      &quot;lit&quot;,
+                      2
+                    ]
+                  ],
+                  [
+                    &quot;seq&quot;,
+                    [
+                      &quot;assign&quot;,
+                      0,
+                      [
+                        &quot;lit&quot;,
+                        0
+                      ]
+                    ],
+                    [
+                      &quot;skip&quot;
+                    ]
+                  ],
+                  [
+                    &quot;skip&quot;
+                  ]
+                ],
+                [
+                  &quot;skip&quot;
+                ]
+              ]
+            ],
+            [
+              &quot;skip&quot;
+            ]
+          ]
+        ],
+        [
+          &quot;skip&quot;
+        ]
+      ],
+      &quot;inputs&quot;: [
+        &quot;int&quot;,
+        &quot;bool&quot;,
+        &quot;int&quot;,
+        &quot;bool&quot;
+      ],
+      &quot;slots&quot;: [
+        &quot;int&quot;,
+        &quot;bool&quot;,
+        &quot;int&quot;,
+        &quot;bool&quot;
+      ],
+      &quot;fields&quot;: 2,
+      &quot;result&quot;: &quot;none&quot;,
+      &quot;initialize&quot;: false
+    },
+    {
+      &quot;name&quot;: &quot;__init__&quot;,
+      &quot;body&quot;: [
+        &quot;seq&quot;,
+        [
+          &quot;assign&quot;,
+          2,
+          [
+            &quot;bool&quot;,
+            false
+          ]
+        ],
+        [
+          &quot;seq&quot;,
+          [
+            &quot;assign&quot;,
+            0,
+            [
+              &quot;lit&quot;,
+              0
+            ]
+          ],
+          [
+            &quot;seq&quot;,
+            [
+              &quot;assign&quot;,
+              1,
+              [
+                &quot;var&quot;,
+                2
+              ]
+            ],
+            [
+              &quot;skip&quot;
+            ]
+          ]
+        ]
+      ],
+      &quot;inputs&quot;: [],
+      &quot;slots&quot;: [
+        &quot;int&quot;,
+        &quot;bool&quot;,
+        &quot;bool&quot;
+      ],
+      &quot;fields&quot;: 2,
+      &quot;result&quot;: &quot;none&quot;,
+      &quot;initialize&quot;: true
+    },
+    {
+      &quot;name&quot;: &quot;__init__&quot;,
+      &quot;body&quot;: [
+        &quot;seq&quot;,
+        [
+          &quot;assign&quot;,
+          2,
+          [
+            &quot;bool&quot;,
+            true
+          ]
+        ],
+        [
+          &quot;seq&quot;,
+          [
+            &quot;assign&quot;,
+            0,
+            [
+              &quot;lit&quot;,
+              0
+            ]
+          ],
+          [
+            &quot;seq&quot;,
+            [
+              &quot;assign&quot;,
+              1,
+              [
+                &quot;var&quot;,
+                2
+              ]
+            ],
+            [
+              &quot;skip&quot;
+            ]
+          ]
+        ]
+      ],
+      &quot;inputs&quot;: [],
+      &quot;slots&quot;: [
+        &quot;int&quot;,
+        &quot;bool&quot;,
+        &quot;bool&quot;
+      ],
+      &quot;fields&quot;: 2,
+      &quot;result&quot;: &quot;none&quot;,
+      &quot;initialize&quot;: true
+    },
+    {
+      &quot;name&quot;: &quot;advance&quot;,
+      &quot;body&quot;: [
+        &quot;seq&quot;,
+        [
+          &quot;branch&quot;,
+          [
+            &quot;bin&quot;,
+            &quot;eq&quot;,
+            [
+              &quot;var&quot;,
+              0
+            ],
+            [
+              &quot;lit&quot;,
+              0
+            ]
+          ],
+          [
+            &quot;seq&quot;,
+            [
+              &quot;assign&quot;,
+              0,
+              [
+                &quot;lit&quot;,
+                1
+              ]
+            ],
+            [
+              &quot;seq&quot;,
+              [
+                &quot;assign&quot;,
+                1,
+                [
+                  &quot;bin&quot;,
+                  &quot;eq&quot;,
+                  [
+                    &quot;var&quot;,
+                    3
+                  ],
+                  [
+                    &quot;bool&quot;,
+                    false
+                  ]
+                ]
+              ],
+              [
+                &quot;skip&quot;
+              ]
+            ]
+          ],
+          [
+            &quot;seq&quot;,
+            [
+              &quot;branch&quot;,
+              [
+                &quot;bin&quot;,
+                &quot;eq&quot;,
+                [
+                  &quot;var&quot;,
+                  0
+                ],
+                [
+                  &quot;lit&quot;,
+                  1
+                ]
+              ],
+              [
+                &quot;seq&quot;,
+                [
+                  &quot;branch&quot;,
+                  [
+                    &quot;bin&quot;,
+                    &quot;or&quot;,
+                    [
+                      &quot;bin&quot;,
+                      &quot;eq&quot;,
+                      [
+                        &quot;var&quot;,
+                        2
+                      ],
+                      [
+                        &quot;lit&quot;,
+                        0
+                      ]
+                    ],
+                    [
+                      &quot;bin&quot;,
+                      &quot;eq&quot;,
+                      [
+                        &quot;var&quot;,
+                        1
+                      ],
+                      [
+                        &quot;var&quot;,
+                        3
+                      ]
+                    ]
+                  ],
+                  [
+                    &quot;seq&quot;,
+                    [
+                      &quot;assign&quot;,
+                      0,
+                      [
+                        &quot;lit&quot;,
+                        2
+                      ]
+                    ],
+                    [
+                      &quot;skip&quot;
+                    ]
+                  ],
+                  [
+                    &quot;skip&quot;
+                  ]
+                ],
+                [
+                  &quot;skip&quot;
+                ]
+              ],
+              [
+                &quot;seq&quot;,
+                [
+                  &quot;branch&quot;,
+                  [
+                    &quot;bin&quot;,
+                    &quot;eq&quot;,
+                    [
+                      &quot;var&quot;,
+                      0
+                    ],
+                    [
+                      &quot;lit&quot;,
+                      2
+                    ]
+                  ],
+                  [
+                    &quot;seq&quot;,
+                    [
+                      &quot;assign&quot;,
+                      0,
+                      [
+                        &quot;lit&quot;,
+                        0
+                      ]
+                    ],
+                    [
+                      &quot;skip&quot;
+                    ]
+                  ],
+                  [
+                    &quot;skip&quot;
+                  ]
+                ],
+                [
+                  &quot;skip&quot;
+                ]
+              ]
+            ],
+            [
+              &quot;skip&quot;
+            ]
+          ]
+        ],
+        [
+          &quot;skip&quot;
+        ]
+      ],
+      &quot;inputs&quot;: [
+        &quot;int&quot;,
+        &quot;bool&quot;,
+        &quot;int&quot;,
+        &quot;bool&quot;
+      ],
+      &quot;slots&quot;: [
+        &quot;int&quot;,
+        &quot;bool&quot;,
+        &quot;int&quot;,
+        &quot;bool&quot;
+      ],
+      &quot;fields&quot;: 2,
+      &quot;result&quot;: &quot;none&quot;,
+      &quot;initialize&quot;: false
+    },
+    {
+      &quot;name&quot;: &quot;mutual_exclusion&quot;,
+      &quot;body&quot;: [
+        &quot;seq&quot;,
+        [
+          &quot;ret&quot;,
+          [
+            &quot;bin&quot;,
+            &quot;eq&quot;,
+            [
+              &quot;bin&quot;,
+              &quot;and&quot;,
+              [
+                &quot;bin&quot;,
+                &quot;eq&quot;,
+                [
+                  &quot;var&quot;,
+                  0
+                ],
+                [
+                  &quot;lit&quot;,
+                  2
+                ]
+              ],
+              [
+                &quot;bin&quot;,
+                &quot;eq&quot;,
+                [
+                  &quot;var&quot;,
+                  1
+                ],
+                [
+                  &quot;lit&quot;,
+                  2
+                ]
+              ]
+            ],
+            [
+              &quot;bool&quot;,
+              false
+            ]
+          ]
+        ],
+        [
+          &quot;skip&quot;
+        ]
+      ],
+      &quot;inputs&quot;: [
+        &quot;int&quot;,
+        &quot;int&quot;,
+        &quot;bool&quot;,
+        &quot;bool&quot;
+      ],
+      &quot;slots&quot;: [
+        &quot;int&quot;,
+        &quot;int&quot;,
+        &quot;bool&quot;,
+        &quot;bool&quot;
+      ],
+      &quot;fields&quot;: 0,
+      &quot;result&quot;: &quot;bool&quot;,
+      &quot;initialize&quot;: false
+    },
+    {
+      &quot;name&quot;: &quot;control_locations&quot;,
+      &quot;body&quot;: [
+        &quot;seq&quot;,
+        [
+          &quot;ret&quot;,
+          [
+            &quot;bin&quot;,
+            &quot;and&quot;,
+            [
+              &quot;bin&quot;,
+              &quot;and&quot;,
+              [
+                &quot;bin&quot;,
+                &quot;le&quot;,
+                [
+                  &quot;lit&quot;,
+                  0
+                ],
+                [
+                  &quot;var&quot;,
+                  0
+                ]
+              ],
+              [
+                &quot;bin&quot;,
+                &quot;le&quot;,
+                [
+                  &quot;var&quot;,
+                  0
+                ],
+                [
+                  &quot;lit&quot;,
+                  2
+                ]
+              ]
+            ],
+            [
+              &quot;bin&quot;,
+              &quot;and&quot;,
+              [
+                &quot;bin&quot;,
+                &quot;le&quot;,
+                [
+                  &quot;lit&quot;,
+                  0
+                ],
+                [
+                  &quot;var&quot;,
+                  1
+                ]
+              ],
+              [
+                &quot;bin&quot;,
+                &quot;le&quot;,
+                [
+                  &quot;var&quot;,
+                  1
+                ],
+                [
+                  &quot;lit&quot;,
+                  2
+                ]
+              ]
+            ]
+          ]
+        ],
+        [
+          &quot;skip&quot;
+        ]
+      ],
+      &quot;inputs&quot;: [
+        &quot;int&quot;,
+        &quot;int&quot;,
+        &quot;bool&quot;,
+        &quot;bool&quot;
+      ],
+      &quot;slots&quot;: [
+        &quot;int&quot;,
+        &quot;int&quot;,
+        &quot;bool&quot;,
+        &quot;bool&quot;
+      ],
+      &quot;fields&quot;: 0,
+      &quot;result&quot;: &quot;bool&quot;,
+      &quot;initialize&quot;: false
+    },
+    {
+      &quot;name&quot;: &quot;priority&quot;,
+      &quot;body&quot;: [
+        &quot;seq&quot;,
+        [
+          &quot;ret&quot;,
+          [
+            &quot;bin&quot;,
+            &quot;and&quot;,
+            [
+              &quot;bin&quot;,
+              &quot;or&quot;,
+              [
+                &quot;bin&quot;,
+                &quot;or&quot;,
+                [
+                  &quot;bin&quot;,
+                  &quot;ne&quot;,
+                  [
+                    &quot;var&quot;,
+                    0
+                  ],
+                  [
+                    &quot;lit&quot;,
+                    2
+                  ]
+                ],
+                [
+                  &quot;bin&quot;,
+                  &quot;ne&quot;,
+                  [
+                    &quot;var&quot;,
+                    1
+                  ],
+                  [
+                    &quot;lit&quot;,
+                    1
+                  ]
+                ]
+              ],
+              [
+                &quot;bin&quot;,
+                &quot;ne&quot;,
+                [
+                  &quot;var&quot;,
+                  2
+                ],
+                [
+                  &quot;var&quot;,
+                  3
+                ]
+              ]
+            ],
+            [
+              &quot;bin&quot;,
+              &quot;or&quot;,
+              [
+                &quot;bin&quot;,
+                &quot;or&quot;,
+                [
+                  &quot;bin&quot;,
+                  &quot;ne&quot;,
+                  [
+                    &quot;var&quot;,
+                    1
+                  ],
+                  [
+                    &quot;lit&quot;,
+                    2
+                  ]
+                ],
+                [
+                  &quot;bin&quot;,
+                  &quot;ne&quot;,
+                  [
+                    &quot;var&quot;,
+                    0
+                  ],
+                  [
+                    &quot;lit&quot;,
+                    1
+                  ]
+                ]
+              ],
+              [
+                &quot;bin&quot;,
+                &quot;eq&quot;,
+                [
+                  &quot;var&quot;,
+                  2
+                ],
+                [
+                  &quot;var&quot;,
+                  3
+                ]
+              ]
+            ]
+          ]
+        ],
+        [
+          &quot;skip&quot;
+        ]
+      ],
+      &quot;inputs&quot;: [
+        &quot;int&quot;,
+        &quot;int&quot;,
+        &quot;bool&quot;,
+        &quot;bool&quot;
+      ],
+      &quot;slots&quot;: [
+        &quot;int&quot;,
+        &quot;int&quot;,
+        &quot;bool&quot;,
+        &quot;bool&quot;
+      ],
+      &quot;fields&quot;: 0,
+      &quot;result&quot;: &quot;bool&quot;,
+      &quot;initialize&quot;: false
+    },
+    {
+      &quot;name&quot;: &quot;paper_initial&quot;,
+      &quot;body&quot;: [
+        &quot;seq&quot;,
+        [
+          &quot;ret&quot;,
+          [
+            &quot;bin&quot;,
+            &quot;and&quot;,
+            [
+              &quot;bin&quot;,
+              &quot;eq&quot;,
+              [
+                &quot;var&quot;,
+                0
+              ],
+              [
+                &quot;lit&quot;,
+                0
+              ]
+            ],
+            [
+              &quot;bin&quot;,
+              &quot;eq&quot;,
+              [
+                &quot;var&quot;,
+                1
+              ],
+              [
+                &quot;lit&quot;,
+                0
+              ]
+            ]
+          ]
+        ],
+        [
+          &quot;skip&quot;
+        ]
+      ],
+      &quot;inputs&quot;: [
+        &quot;int&quot;,
+        &quot;int&quot;,
+        &quot;bool&quot;,
+        &quot;bool&quot;
+      ],
+      &quot;slots&quot;: [
+        &quot;int&quot;,
+        &quot;int&quot;,
+        &quot;bool&quot;,
+        &quot;bool&quot;
+      ],
+      &quot;fields&quot;: 0,
+      &quot;result&quot;: &quot;bool&quot;,
+      &quot;initialize&quot;: false
+    },
+    {
+      &quot;name&quot;: &quot;paper_round&quot;,
+      &quot;body&quot;: [
+        &quot;seq&quot;,
+        [
+          &quot;skip&quot;
+        ],
+        [
+          &quot;seq&quot;,
+          [
+            &quot;assign&quot;,
+            8,
+            [
+              &quot;bin&quot;,
+              &quot;or&quot;,
+              [
+                &quot;bin&quot;,
+                &quot;or&quot;,
+                [
+                  &quot;bin&quot;,
+                  &quot;or&quot;,
+                  [
+                    &quot;bin&quot;,
+                    &quot;and&quot;,
+                    [
+                      &quot;bin&quot;,
+                      &quot;eq&quot;,
+                      [
+                        &quot;var&quot;,
+                        4
+                      ],
+                      [
+                        &quot;var&quot;,
+                        0
+                      ]
+                    ],
+                    [
+                      &quot;bin&quot;,
+                      &quot;eq&quot;,
+                      [
+                        &quot;var&quot;,
+                        6
+                      ],
+                      [
+                        &quot;var&quot;,
+                        2
+                      ]
+                    ]
+                  ],
+                  [
+                    &quot;bin&quot;,
+                    &quot;and&quot;,
+                    [
+                      &quot;bin&quot;,
+                      &quot;and&quot;,
+                      [
+                        &quot;bin&quot;,
+                        &quot;eq&quot;,
+                        [
+                          &quot;var&quot;,
+                          0
+                        ],
+                        [
+                          &quot;lit&quot;,
+                          0
+                        ]
+                      ],
+                      [
+                        &quot;bin&quot;,
+                        &quot;eq&quot;,
+                        [
+                          &quot;var&quot;,
+                          4
+                        ],
+                        [
+                          &quot;lit&quot;,
+                          1
+                        ]
+                      ]
+                    ],
+                    [
+                      &quot;bin&quot;,
+                      &quot;eq&quot;,
+                      [
+                        &quot;var&quot;,
+                        6
+                      ],
+                      [
+                        &quot;var&quot;,
+                        3
+                      ]
+                    ]
+                  ]
+                ],
+                [
+                  &quot;bin&quot;,
+                  &quot;and&quot;,
+                  [
+                    &quot;bin&quot;,
+                    &quot;and&quot;,
+                    [
+                      &quot;bin&quot;,
+                      &quot;and&quot;,
+                      [
+                        &quot;bin&quot;,
+                        &quot;eq&quot;,
+                        [
+                          &quot;var&quot;,
+                          0
+                        ],
+                        [
+                          &quot;lit&quot;,
+                          1
+                        ]
+                      ],
+                      [
+                        &quot;bin&quot;,
+                        &quot;or&quot;,
+                        [
+                          &quot;bin&quot;,
+                          &quot;eq&quot;,
+                          [
+                            &quot;var&quot;,
+                            1
+                          ],
+                          [
+                            &quot;lit&quot;,
+                            0
+                          ]
+                        ],
+                        [
+                          &quot;bin&quot;,
+                          &quot;ne&quot;,
+                          [
+                            &quot;var&quot;,
+                            2
+                          ],
+                          [
+                            &quot;var&quot;,
+                            3
+                          ]
+                        ]
+                      ]
+                    ],
+                    [
+                      &quot;bin&quot;,
+                      &quot;eq&quot;,
+                      [
+                        &quot;var&quot;,
+                        4
+                      ],
+                      [
+                        &quot;lit&quot;,
+                        2
+                      ]
+                    ]
+                  ],
+                  [
+                    &quot;bin&quot;,
+                    &quot;eq&quot;,
+                    [
+                      &quot;var&quot;,
+                      6
+                    ],
+                    [
+                      &quot;var&quot;,
+                      2
+                    ]
+                  ]
+                ]
+              ],
+              [
+                &quot;bin&quot;,
+                &quot;and&quot;,
+                [
+                  &quot;bin&quot;,
+                  &quot;and&quot;,
+                  [
+                    &quot;bin&quot;,
+                    &quot;eq&quot;,
+                    [
+                      &quot;var&quot;,
+                      0
+                    ],
+                    [
+                      &quot;lit&quot;,
+                      2
+                    ]
+                  ],
+                  [
+                    &quot;bin&quot;,
+                    &quot;eq&quot;,
+                    [
+                      &quot;var&quot;,
+                      4
+                    ],
+                    [
+                      &quot;lit&quot;,
+                      0
+                    ]
+                  ]
+                ],
+                [
+                  &quot;bin&quot;,
+                  &quot;eq&quot;,
+                  [
+                    &quot;var&quot;,
+                    6
+                  ],
+                  [
+                    &quot;var&quot;,
+                    2
+                  ]
+                ]
+              ]
+            ]
+          ],
+          [
+            &quot;seq&quot;,
+            [
+              &quot;assign&quot;,
+              9,
+              [
+                &quot;bin&quot;,
+                &quot;or&quot;,
+                [
+                  &quot;bin&quot;,
+                  &quot;or&quot;,
+                  [
+                    &quot;bin&quot;,
+                    &quot;or&quot;,
+                    [
+                      &quot;bin&quot;,
+                      &quot;and&quot;,
+                      [
+                        &quot;bin&quot;,
+                        &quot;eq&quot;,
+                        [
+                          &quot;var&quot;,
+                          5
+                        ],
+                        [
+                          &quot;var&quot;,
+                          1
+                        ]
+                      ],
+                      [
+                        &quot;bin&quot;,
+                        &quot;eq&quot;,
+                        [
+                          &quot;var&quot;,
+                          7
+                        ],
+                        [
+                          &quot;var&quot;,
+                          3
+                        ]
+                      ]
+                    ],
+                    [
+                      &quot;bin&quot;,
+                      &quot;and&quot;,
+                      [
+                        &quot;bin&quot;,
+                        &quot;and&quot;,
+                        [
+                          &quot;bin&quot;,
+                          &quot;eq&quot;,
+                          [
+                            &quot;var&quot;,
+                            1
+                          ],
+                          [
+                            &quot;lit&quot;,
+                            0
+                          ]
+                        ],
+                        [
+                          &quot;bin&quot;,
+                          &quot;eq&quot;,
+                          [
+                            &quot;var&quot;,
+                            5
+                          ],
+                          [
+                            &quot;lit&quot;,
+                            1
+                          ]
+                        ]
+                      ],
+                      [
+                        &quot;bin&quot;,
+                        &quot;eq&quot;,
+                        [
+                          &quot;var&quot;,
+                          7
+                        ],
+                        [
+                          &quot;bin&quot;,
+                          &quot;eq&quot;,
+                          [
+                            &quot;var&quot;,
+                            2
+                          ],
+                          [
+                            &quot;bool&quot;,
+                            false
+                          ]
+                        ]
+                      ]
+                    ]
+                  ],
+                  [
+                    &quot;bin&quot;,
+                    &quot;and&quot;,
+                    [
+                      &quot;bin&quot;,
+                      &quot;and&quot;,
+                      [
+                        &quot;bin&quot;,
+                        &quot;and&quot;,
+                        [
+                          &quot;bin&quot;,
+                          &quot;eq&quot;,
+                          [
+                            &quot;var&quot;,
+                            1
+                          ],
+                          [
+                            &quot;lit&quot;,
+                            1
+                          ]
+                        ],
+                        [
+                          &quot;bin&quot;,
+                          &quot;or&quot;,
+                          [
+                            &quot;bin&quot;,
+                            &quot;eq&quot;,
+                            [
+                              &quot;var&quot;,
+                              0
+                            ],
+                            [
+                              &quot;lit&quot;,
+                              0
+                            ]
+                          ],
+                          [
+                            &quot;bin&quot;,
+                            &quot;eq&quot;,
+                            [
+                              &quot;var&quot;,
+                              2
+                            ],
+                            [
+                              &quot;var&quot;,
+                              3
+                            ]
+                          ]
+                        ]
+                      ],
+                      [
+                        &quot;bin&quot;,
+                        &quot;eq&quot;,
+                        [
+                          &quot;var&quot;,
+                          5
+                        ],
+                        [
+                          &quot;lit&quot;,
+                          2
+                        ]
+                      ]
+                    ],
+                    [
+                      &quot;bin&quot;,
+                      &quot;eq&quot;,
+                      [
+                        &quot;var&quot;,
+                        7
+                      ],
+                      [
+                        &quot;var&quot;,
+                        3
+                      ]
+                    ]
+                  ]
+                ],
+                [
+                  &quot;bin&quot;,
+                  &quot;and&quot;,
+                  [
+                    &quot;bin&quot;,
+                    &quot;and&quot;,
+                    [
+                      &quot;bin&quot;,
+                      &quot;eq&quot;,
+                      [
+                        &quot;var&quot;,
+                        1
+                      ],
+                      [
+                        &quot;lit&quot;,
+                        2
+                      ]
+                    ],
+                    [
+                      &quot;bin&quot;,
+                      &quot;eq&quot;,
+                      [
+                        &quot;var&quot;,
+                        5
+                      ],
+                      [
+                        &quot;lit&quot;,
+                        0
+                      ]
+                    ]
+                  ],
+                  [
+                    &quot;bin&quot;,
+                    &quot;eq&quot;,
+                    [
+                      &quot;var&quot;,
+                      7
+                    ],
+                    [
+                      &quot;var&quot;,
+                      3
+                    ]
+                  ]
+                ]
+              ]
+            ],
+            [
+              &quot;seq&quot;,
+              [
+                &quot;ret&quot;,
+                [
+                  &quot;bin&quot;,
+                  &quot;and&quot;,
+                  [
+                    &quot;var&quot;,
+                    8
+                  ],
+                  [
+                    &quot;var&quot;,
+                    9
+                  ]
+                ]
+              ],
+              [
+                &quot;skip&quot;
+              ]
+            ]
+          ]
+        ]
+      ],
+      &quot;inputs&quot;: [
+        &quot;int&quot;,
+        &quot;int&quot;,
+        &quot;bool&quot;,
+        &quot;bool&quot;,
+        &quot;int&quot;,
+        &quot;int&quot;,
+        &quot;bool&quot;,
+        &quot;bool&quot;
+      ],
+      &quot;slots&quot;: [
+        &quot;int&quot;,
+        &quot;int&quot;,
+        &quot;bool&quot;,
+        &quot;bool&quot;,
+        &quot;int&quot;,
+        &quot;int&quot;,
+        &quot;bool&quot;,
+        &quot;bool&quot;,
+        &quot;bool&quot;,
+        &quot;bool&quot;
+      ],
+      &quot;fields&quot;: 0,
+      &quot;result&quot;: &quot;bool&quot;,
+      &quot;initialize&quot;: false
+    }
+  ],
+  &quot;sha256&quot;: &quot;13d66f0f1519e9975657dbd833c77b8f7b80fed8062d81d6bb21681fee34ea9b&quot;
+}
+</code></pre></details><details><summary>report.json</summary><pre><code>{
+  &quot;status&quot;: &quot;proved&quot;,
+  &quot;properties&quot;: {
+    &quot;invariant:mutual_exclusion&quot;: {
+      &quot;status&quot;: &quot;proved&quot;
+    },
+    &quot;auxiliary:control_locations&quot;: {
+      &quot;status&quot;: &quot;proved&quot;
+    },
+    &quot;auxiliary:priority&quot;: {
+      &quot;status&quot;: &quot;proved&quot;
+    },
+    &quot;relation:paper_initial&quot;: {
+      &quot;status&quot;: &quot;proved&quot;
+    },
+    &quot;relation:paper_round&quot;: {
+      &quot;status&quot;: &quot;proved&quot;
+    }
+  },
+  &quot;checks&quot;: [],
+  &quot;translation&quot;: &quot;proved&quot;,
+  &quot;evidence&quot;: &quot;/home/angeloh/Desktop/work/paxos/formal/.rmverify/peterson-v2/compose-iip_hjke&quot;,
+  &quot;diagnostics&quot;: [
+    &quot;204 Python/RM probes passed (regression evidence only)&quot;
+  ]
+}
+</code></pre></details><details><summary>lean-toolchain</summary><pre><code>leanprover/lean4:v4.30.0
+</code></pre></details><details><summary>lakefile.toml</summary><pre><code>name = &quot;rmverifyEvidence&quot;
+defaultTargets = [&quot;Semantics&quot;]
+[[lean_lib]]
+name = &quot;Semantics&quot;
+</code></pre></details></body></html>
